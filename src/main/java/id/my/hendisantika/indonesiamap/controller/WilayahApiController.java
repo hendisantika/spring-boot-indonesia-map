@@ -62,6 +62,12 @@ public class WilayahApiController {
         return ResponseEntity.ok(boundary);
     }
 
+    @GetMapping("/boundaries/kabupaten/{provinceCode:.+}")
+    public ResponseEntity<List<Map<String, Object>>> getKabupatenBoundaries(@PathVariable String provinceCode) {
+        List<Map<String, Object>> boundaries = boundaryService.getKabupatenBoundaries(provinceCode);
+        return ResponseEntity.ok(boundaries);
+    }
+
     @GetMapping("/detail/{code:.+}")
     public ResponseEntity<Map<String, Object>> getDetail(@PathVariable String code) {
         Wilayah wilayah = wilayahService.findByCode(code);
