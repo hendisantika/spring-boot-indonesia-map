@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="id" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data Wilayah Indonesia - KEMENDAGRI 2025</title>
+
+    <!-- W3.CSS -->
+    <link rel="stylesheet" href="https://www.w3schools.com/w3css/5/w3.css">
+    <link id="theme-css" rel="stylesheet" href="https://www.w3schools.com/lib/w3-theme-indigo.css">
+
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        #map { width: 100%; height: 650px; border-radius: 8px; z-index: 1; }
+        .sidebar { min-width: 320px; max-width: 380px; }
+        .theme-btn {
+            width: 30px; height: 30px; border-radius: 50%;
+            border: 2px solid #fff; cursor: pointer;
+            display: inline-block; margin: 2px;
+            transition: transform 0.2s;
+        }
+        .theme-btn:hover { transform: scale(1.2); }
+        .card-hover { transition: box-shadow 0.3s; }
+        .card-hover:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.2) !important; }
+        .stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+        .stat-card {
+            text-align: center; padding: 12px; border-radius: 8px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .stat-card h3 { margin: 0; font-size: 1.5em; }
+        .stat-card p { margin: 4px 0 0; font-size: 0.8em; opacity: 0.9; }
+        .loading-overlay {
+            display: none; position: fixed; top: 0; left: 0;
+            width: 100%; height: 100%; background: rgba(0,0,0,0.3);
+            z-index: 9999; justify-content: center; align-items: center;
+        }
+        .loading-overlay.active { display: flex; }
+        .spinner {
+            border: 4px solid #f3f3f3; border-top: 4px solid #3498db;
+            border-radius: 50%; width: 50px; height: 50px;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @media (max-width: 768px) {
+            .sidebar { min-width: 100%; max-width: 100%; }
+            #map { height: 400px; }
+            .stats-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+    </style>
+</head>
+<body class="w3-light-grey">
+
+<!-- Loading overlay -->
+<div id="loading" class="loading-overlay">
+    <div class="w3-center">
+        <div class="spinner"></div>
+        <p class="w3-text-white w3-margin-top">Memuat data...</p>
+    </div>
+</div>
+
+<!-- Navbar -->
+<nav class="w3-bar w3-theme-d2 w3-card">
+    <a class="w3-bar-item w3-button w3-hide-medium w3-hide-large w3-right" onclick="openNav()">
+        <i class="fa fa-bars"></i>
+    </a>
+    <a class="w3-bar-item w3-button w3-theme-d4">
+        <i class="fa fa-map-location-dot"></i> <b>Peta Indonesia</b>
+    </a>
+    <div id="mobileNav" class="w3-hide-small">
+        <a class="w3-bar-item w3-button" onclick="resetMapView()">
+            <i class="fa fa-rotate-left"></i> Reset View
+        </a>
+        <a class="w3-bar-item w3-button" onclick="showProvinces()">
+            <i class="fa fa-map-marker-alt"></i> Show Provinces
+        </a>
+    </div>
+</nav>
+
+<!-- Main Content -->
+<div class="w3-row-padding w3-margin-top" style="display: flex; flex-wrap: wrap;">
+
+    <!-- Sidebar -->
+    <div class="sidebar w3-margin-bottom">
+        <!-- Stats -->
+        <div class="w3-card w3-white w3-round-large w3-margin-bottom card-hover">
+            <div class="w3-container w3-theme-d1 w3-round-large" style="border-radius: 8px 8px 0 0;">
+                <h4><i class="fa fa-chart-bar"></i> Statistik Wilayah</h4>
+            </div>
+            <div class="w3-container w3-padding">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <h3>38</h3>
+                        <p>Provinsi</p>
+                    </div>
+                    <div class="stat-card" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+                        <h3>514</h3>
+                        <p>Kab/Kota</p>
+                    </div>
+                    <div class="stat-card" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
+                        <h3>7.069</h3>
+                        <p>Kecamatan</p>
+                    </div>
+                    <div class="stat-card" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);">
+                        <h3>81.911</h3>
+                        <p>Desa/Kel</p>
+                    </div>
+                </div>
+                <p class="w3-tiny w3-text-grey w3-center">
+                    Sumber: Kepmendagri No 300.2.2-2138 Tahun 2025
+                </p>
+            </div>
+        </div>
+
+        <!-- Selection Panel -->
+        <div class="w3-card w3-white w3-round-large w3-margin-bottom card-hover">
+            <div class="w3-container w3-theme-d1" style="border-radius: 8px 8px 0 0;">
+                <h4><i class="fa fa-search-location"></i> Pilih Wilayah</h4>
+            </div>
+            <div class="w3-container w3-padding">
+                <!-- Province -->
+                <label class="w3-text-theme"><b><i class="fa fa-globe-asia"></i> Provinsi</b></label>
+                <select class="w3-select w3-border w3-round w3-margin-bottom"
+                        id="provinsi-select"
+                        onchange="handleProvinsiChange(this.value)">
+                    <option value="">Pilih Provinsi</option>
+                    <option th:each="prov : ${provinces}"
+                            th:value="${prov.code}"
+                            th:text="${prov.name}">
+                    </option>
+                </select>
+
+                <!-- Kabupaten (loaded via fetch) -->
+                <div id="kabupaten-container">
+                    <label class="w3-text-theme"><b><i class="fa fa-city"></i> Kabupaten/Kota</b></label>
+                    <select class="w3-select w3-border w3-round w3-margin-bottom" id="kabupaten-select" disabled>
+                        <option value="">Pilih Kabupaten/Kota</option>
+                    </select>
+                </div>
+
+                <!-- Kecamatan -->
+                <div id="kecamatan-container">
+                    <label class="w3-text-theme"><b><i class="fa fa-building"></i> Kecamatan</b></label>
+                    <select class="w3-select w3-border w3-round w3-margin-bottom" id="kecamatan-select" disabled>
+                        <option value="">Pilih Kecamatan</option>
+                    </select>
+                </div>
+
+                <!-- Desa -->
+                <div id="desa-container">
+                    <label class="w3-text-theme"><b><i class="fa fa-home"></i> Desa/Kelurahan</b></label>
+                    <select class="w3-select w3-border w3-round w3-margin-bottom" id="desa-select" disabled>
+                        <option value="">Pilih Desa/Kelurahan</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Detail Panel -->
+        <div id="detail-panel" class="w3-card w3-white w3-round-large w3-margin-bottom card-hover">
+            <div class="w3-container w3-theme-d1" style="border-radius: 8px 8px 0 0;">
+                <h4><i class="fa fa-info-circle"></i> Detail Wilayah</h4>
+            </div>
+            <div class="w3-container w3-padding w3-center w3-text-grey">
+                <i class="fa fa-map-marked-alt fa-3x w3-margin-bottom" style="opacity:0.3;"></i>
+                <p>Pilih wilayah untuk melihat detail</p>
+            </div>
+        </div>
+
+        <!-- Theme Selector -->
+        <div class="w3-card w3-white w3-round-large card-hover">
+            <div class="w3-container w3-theme-d1" style="border-radius: 8px 8px 0 0;">
+                <h4><i class="fa fa-palette"></i> Tema</h4>
+            </div>
+            <div class="w3-container w3-padding w3-center">
+                <span class="theme-btn" style="background:#3f51b5;" onclick="changeTheme('indigo')" title="Indigo"></span>
+                <span class="theme-btn" style="background:#2196f3;" onclick="changeTheme('blue')" title="Blue"></span>
+                <span class="theme-btn" style="background:#009688;" onclick="changeTheme('teal')" title="Teal"></span>
+                <span class="theme-btn" style="background:#4caf50;" onclick="changeTheme('green')" title="Green"></span>
+                <span class="theme-btn" style="background:#ff5722;" onclick="changeTheme('deep-orange')" title="Deep Orange"></span>
+                <span class="theme-btn" style="background:#9c27b0;" onclick="changeTheme('purple')" title="Purple"></span>
+                <span class="theme-btn" style="background:#f44336;" onclick="changeTheme('red')" title="Red"></span>
+                <span class="theme-btn" style="background:#607d8b;" onclick="changeTheme('blue-grey')" title="Blue Grey"></span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Map -->
+    <div class="w3-rest">
+        <div class="w3-card w3-white w3-round-large card-hover">
+            <div class="w3-container w3-theme-d1" style="border-radius: 8px 8px 0 0;">
+                <h4><i class="fa fa-map"></i> Peta Indonesia</h4>
+            </div>
+            <div id="map"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Footer -->
+<footer class="w3-container w3-theme-d2 w3-padding w3-margin-top w3-center">
+    <p>Data Wilayah Indonesia berdasarkan
+        <b>Kepmendagri No 300.2.2-2138 Tahun 2025</b> |
+        Powered by <a href="https://wilayah.id" target="_blank" class="w3-text-white"><b>wilayah.id</b></a> &amp;
+        <a href="https://spring.io/projects/spring-boot" target="_blank" class="w3-text-white"><b>Spring Boot</b></a>
+    </p>
+</footer>
+
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+    // ===== Theme =====
+    function changeTheme(theme) {
+        document.getElementById('theme-css').href =
+            'https://www.w3schools.com/lib/w3-theme-' + theme + '.css';
+        localStorage.setItem('selectedTheme', theme);
+    }
+
+    window.addEventListener('DOMContentLoaded', function () {
+        const savedTheme = localStorage.getItem('selectedTheme') || 'indigo';
+        changeTheme(savedTheme);
+    });
+
+    function openNav() {
+        const nav = document.getElementById("mobileNav");
+        nav.classList.toggle("w3-show");
+    }
+
+    // ===== Map =====
+    const map = L.map('map').setView([-2.5489, 118.0149], 5);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        maxZoom: 18
+    }).addTo(map);
+
+    const markersLayer = L.layerGroup().addTo(map);
+    const boundaryLayer = L.layerGroup().addTo(map);
+
+    // ===== Loading =====
+    function showLoading() {
+        document.getElementById('loading').classList.add('active');
+    }
+
+    function hideLoading() {
+        document.getElementById('loading').classList.remove('active');
+    }
+
+    // ===== GeoJSON Coordinate Utilities =====
+    function getArrayDepth(arr) {
+        return Array.isArray(arr) ? 1 + Math.max(0, ...arr.map(getArrayDepth)) : 0;
+    }
+
+    function convertToLeafletFormat(coords) {
+        const depth = getArrayDepth(coords);
+
+        function swapCoords(point) {
+            if (Array.isArray(point) && point.length >= 2 &&
+                typeof point[0] === 'number' && typeof point[1] === 'number') {
+                return [point[1], point[0]];
+            }
+            return point;
+        }
+
+        function processCoords(arr, currentDepth) {
+            if (currentDepth === 1) return swapCoords(arr);
+            if (Array.isArray(arr)) return arr.map(item => processCoords(item, currentDepth - 1));
+            return arr;
+        }
+
+        // Check if coordinates need swapping (lng > 90 means GeoJSON format)
+        let firstPoint = coords;
+        while (Array.isArray(firstPoint) && firstPoint.length > 0) {
+            if (typeof firstPoint[0] === 'number' && typeof firstPoint[1] === 'number') {
+                if (Math.abs(firstPoint[0]) > 90) {
+                    return processCoords(coords, depth);
+                }
+                break;
+            }
+            firstPoint = firstPoint[0];
+        }
+        return coords;
+    }
+
+    // ===== Dropdown Handlers =====
+    function handleProvinsiChange(kode) {
+        if (!kode) return;
+        showLoading();
+        loadDetail(kode);
+        loadDropdown('/wilayah/kabupaten-select/' + kode, 'kabupaten-container');
+        resetContainer('kecamatan-container', 'Kecamatan', 'fa-building');
+        resetContainer('desa-container', 'Desa/Kelurahan', 'fa-home');
+    }
+
+    function handleKabupatenChange(kode) {
+        if (!kode) return;
+        showLoading();
+        loadDetail(kode);
+        loadDropdown('/wilayah/kecamatan-select/' + kode, 'kecamatan-container');
+        resetContainer('desa-container', 'Desa/Kelurahan', 'fa-home');
+    }
+
+    function handleKecamatanChange(kode) {
+        if (!kode) return;
+        showLoading();
+        loadDetail(kode);
+        loadDropdown('/wilayah/desa-select/' + kode, 'desa-container');
+    }
+
+    function handleDesaChange(kode) {
+        if (!kode) return;
+        showLoading();
+        loadDetail(kode);
+    }
+
+    function loadDropdown(url, containerId) {
+        fetch(url)
+            .then(r => r.text())
+            .then(html => {
+                document.getElementById(containerId).innerHTML = html;
+            })
+            .catch(err => console.error('Error loading dropdown:', err));
+    }
+
+    function resetContainer(containerId, label, icon) {
+        const typeId = containerId.replace('-container', '-select');
+        document.getElementById(containerId).innerHTML =
+            '<label class="w3-text-theme"><b><i class="fa ' + icon + '"></i> ' + label + '</b></label>' +
+            '<select class="w3-select w3-border w3-round w3-margin-bottom" id="' + typeId + '" disabled>' +
+            '<option value="">Pilih ' + label + '</option></select>';
+    }
+
+    // ===== Detail & Boundary Loading =====
+    function loadDetail(kode) {
+        // Load detail panel
+        fetch('/wilayah/detail/' + kode)
+            .then(r => r.text())
+            .then(html => {
+                document.getElementById('detail-panel').innerHTML = html;
+            })
+            .catch(err => console.error('Error loading detail:', err));
+
+        // Load boundary
+        fetch('/wilayah/api/boundary/' + kode)
+            .then(r => {
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                return r.json();
+            })
+            .then(data => {
+                markersLayer.clearLayers();
+                boundaryLayer.clearLayers();
+
+                // Add marker
+                if (data.lat && data.lng) {
+                    L.marker([data.lat, data.lng])
+                        .bindPopup('<b>' + data.nama + '</b><br>Kode: ' + data.kode)
+                        .addTo(markersLayer);
+                }
+
+                // Add boundary polygon
+                if (data.coordinates) {
+                    try {
+                        let coordinates = JSON.parse(data.coordinates);
+
+                        if (coordinates.type && coordinates.coordinates) {
+                            // GeoJSON geometry object
+                            const geoLayer = L.geoJSON({
+                                type: "Feature",
+                                geometry: coordinates
+                            }, {
+                                style: {
+                                    color: '#3388ff',
+                                    fillColor: '#3388ff',
+                                    fillOpacity: 0.2,
+                                    weight: 2
+                                }
+                            }).bindPopup('<b>' + data.nama + '</b><br>' + data.level)
+                              .addTo(boundaryLayer);
+                            map.fitBounds(geoLayer.getBounds(), {padding: [50, 50]});
+                        } else {
+                            // Raw coordinate array
+                            const leafletCoords = convertToLeafletFormat(coordinates);
+                            const polygon = L.polygon(leafletCoords, {
+                                color: '#3388ff',
+                                fillColor: '#3388ff',
+                                fillOpacity: 0.2,
+                                weight: 2
+                            }).bindPopup('<b>' + data.nama + '</b><br>' + data.level)
+                              .addTo(boundaryLayer);
+                            map.fitBounds(polygon.getBounds(), {padding: [50, 50]});
+                        }
+                    } catch (e) {
+                        console.error('Error parsing boundary:', e);
+                        if (data.lat && data.lng) map.setView([data.lat, data.lng], 10);
+                    }
+                } else if (data.lat && data.lng) {
+                    map.setView([data.lat, data.lng], 10);
+                }
+            })
+            .catch(err => console.error('Error loading boundary:', err))
+            .finally(() => hideLoading());
+    }
+
+    // ===== Map Controls =====
+    function resetMapView() {
+        map.setView([-2.5489, 118.0149], 5);
+        markersLayer.clearLayers();
+        boundaryLayer.clearLayers();
+    }
+
+    function showProvinces() {
+        showLoading();
+        fetch('/wilayah/api/all')
+            .then(r => r.json())
+            .then(data => {
+                markersLayer.clearLayers();
+                boundaryLayer.clearLayers();
+                data.forEach(prov => {
+                    if (prov.lat && prov.lng) {
+                        L.marker([prov.lat, prov.lng])
+                            .bindPopup('<b>' + prov.nama + '</b><br>Kode: ' + prov.kode)
+                            .addTo(markersLayer);
+                    }
+                });
+                map.setView([-2.5489, 118.0149], 5);
+            })
+            .catch(err => console.error('Error loading provinces:', err))
+            .finally(() => hideLoading());
+    }
+
+    // Load provinces on start
+    showProvinces();
+</script>
+
+</body>
+</html>

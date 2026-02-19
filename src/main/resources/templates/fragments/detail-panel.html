@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="id" xmlns:th="http://www.thymeleaf.org">
+<body>
+<div th:fragment="detail">
+    <div class="w3-card w3-white w3-round-large card-hover">
+        <div class="w3-container w3-theme-d1" style="border-radius: 8px 8px 0 0;">
+            <h4><i class="fa fa-info-circle"></i> Detail Wilayah</h4>
+        </div>
+        <div class="w3-container w3-padding">
+            <table class="w3-table w3-bordered">
+                <tr>
+                    <td><b><i class="fa fa-tag"></i> Kode</b></td>
+                    <td th:text="${wilayah.code}">-</td>
+                </tr>
+                <tr>
+                    <td><b><i class="fa fa-map-pin"></i> Nama</b></td>
+                    <td th:text="${wilayah.name}">-</td>
+                </tr>
+                <tr>
+                    <td><b><i class="fa fa-layer-group"></i> Level</b></td>
+                    <td th:text="${level}">-</td>
+                </tr>
+            </table>
+        </div>
+    </div>
+</div>
+</body>
+</html>
