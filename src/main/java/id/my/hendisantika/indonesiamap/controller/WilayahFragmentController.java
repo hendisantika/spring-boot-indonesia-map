@@ -28,7 +28,7 @@ public class WilayahFragmentController {
 
     private final WilayahService wilayahService;
 
-    @GetMapping("/kabupaten-select/{provinceCode}")
+    @GetMapping("/kabupaten-select/{provinceCode:.+}")
     public String kabupatenSelect(@PathVariable String provinceCode, Model model) {
         List<Wilayah> regencies = wilayahService.getRegencies(provinceCode);
         model.addAttribute("items", regencies);
@@ -36,10 +36,10 @@ public class WilayahFragmentController {
         model.addAttribute("label", "Kabupaten/Kota");
         model.addAttribute("icon", "fa-city");
         model.addAttribute("onChange", "handleKabupatenChange");
-        return "fragments/select-dropdown";
+        return "fragments/select-dropdown :: dropdown";
     }
 
-    @GetMapping("/kecamatan-select/{regencyCode}")
+    @GetMapping("/kecamatan-select/{regencyCode:.+}")
     public String kecamatanSelect(@PathVariable String regencyCode, Model model) {
         List<Wilayah> districts = wilayahService.getDistricts(regencyCode);
         model.addAttribute("items", districts);
@@ -47,10 +47,10 @@ public class WilayahFragmentController {
         model.addAttribute("label", "Kecamatan");
         model.addAttribute("icon", "fa-building");
         model.addAttribute("onChange", "handleKecamatanChange");
-        return "fragments/select-dropdown";
+        return "fragments/select-dropdown :: dropdown";
     }
 
-    @GetMapping("/desa-select/{districtCode}")
+    @GetMapping("/desa-select/{districtCode:.+}")
     public String desaSelect(@PathVariable String districtCode, Model model) {
         List<Wilayah> villages = wilayahService.getVillages(districtCode);
         model.addAttribute("items", villages);
@@ -58,15 +58,15 @@ public class WilayahFragmentController {
         model.addAttribute("label", "Desa/Kelurahan");
         model.addAttribute("icon", "fa-home");
         model.addAttribute("onChange", "handleDesaChange");
-        return "fragments/select-dropdown";
+        return "fragments/select-dropdown :: dropdown";
     }
 
-    @GetMapping("/detail/{code}")
+    @GetMapping("/detail/{code:.+}")
     public String detail(@PathVariable String code, Model model) {
         Wilayah wilayah = wilayahService.findByCode(code);
         String level = wilayahService.getLevelName(code);
         model.addAttribute("wilayah", wilayah);
         model.addAttribute("level", level);
-        return "fragments/detail-panel";
+        return "fragments/detail-panel :: detail";
     }
 }

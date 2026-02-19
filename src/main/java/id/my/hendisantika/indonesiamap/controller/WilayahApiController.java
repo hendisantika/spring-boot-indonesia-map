@@ -38,22 +38,22 @@ public class WilayahApiController {
         return ResponseEntity.ok(wilayahService.getProvinces());
     }
 
-    @GetMapping("/regencies/{provinceCode}")
+    @GetMapping("/regencies/{provinceCode:.+}")
     public ResponseEntity<List<Wilayah>> getRegencies(@PathVariable String provinceCode) {
         return ResponseEntity.ok(wilayahService.getRegencies(provinceCode));
     }
 
-    @GetMapping("/districts/{regencyCode}")
+    @GetMapping("/districts/{regencyCode:.+}")
     public ResponseEntity<List<Wilayah>> getDistricts(@PathVariable String regencyCode) {
         return ResponseEntity.ok(wilayahService.getDistricts(regencyCode));
     }
 
-    @GetMapping("/villages/{districtCode}")
+    @GetMapping("/villages/{districtCode:.+}")
     public ResponseEntity<List<Wilayah>> getVillages(@PathVariable String districtCode) {
         return ResponseEntity.ok(wilayahService.getVillages(districtCode));
     }
 
-    @GetMapping("/boundary/{code}")
+    @GetMapping("/boundary/{code:.+}")
     public ResponseEntity<Map<String, Object>> getBoundary(@PathVariable String code) {
         Map<String, Object> boundary = boundaryService.getBoundary(code);
         if (boundary.isEmpty()) {
@@ -62,7 +62,7 @@ public class WilayahApiController {
         return ResponseEntity.ok(boundary);
     }
 
-    @GetMapping("/detail/{code}")
+    @GetMapping("/detail/{code:.+}")
     public ResponseEntity<Map<String, Object>> getDetail(@PathVariable String code) {
         Wilayah wilayah = wilayahService.findByCode(code);
         String level = wilayahService.getLevelName(code);

@@ -17,8 +17,9 @@
 
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        #map { width: 100%; height: 650px; border-radius: 8px; z-index: 1; }
+        #map { width: 100%; height: 650px; border-radius: 0 0 8px 8px; z-index: 1; }
         .sidebar { min-width: 320px; max-width: 380px; }
+        .map-wrapper { flex: 1; min-width: 0; }
         .theme-btn {
             width: 30px; height: 30px; border-radius: 50%;
             border: 2px solid #fff; cursor: pointer;
@@ -192,7 +193,7 @@
     </div>
 
     <!-- Map -->
-    <div class="w3-rest">
+    <div class="map-wrapper w3-margin-bottom">
         <div class="w3-card w3-white w3-round-large card-hover">
             <div class="w3-container w3-theme-d1" style="border-radius: 8px 8px 0 0;">
                 <h4><i class="fa fa-map"></i> Peta Indonesia</h4>
@@ -432,6 +433,11 @@
             .catch(err => console.error('Error loading provinces:', err))
             .finally(() => hideLoading());
     }
+
+    // Fix map rendering in flex layout
+    setTimeout(function () {
+        map.invalidateSize();
+    }, 200);
 
     // Load provinces on start
     showProvinces();
