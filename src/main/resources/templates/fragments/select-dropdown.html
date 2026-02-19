@@ -7,7 +7,8 @@
     </label>
     <select class="w3-select w3-border w3-round w3-margin-bottom"
             th:id="${type} + '-select'"
-            th:onchange="|${onChange}(this.value)|">
+            th:data-type="${type}"
+            onchange="handleSelectChange(this)">
         <option value="">Pilih <span th:text="${label}">Label</span></option>
         <option th:each="item : ${items}"
                 th:value="${item.code}"

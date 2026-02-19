@@ -289,6 +289,14 @@
     }
 
     // ===== Dropdown Handlers =====
+    function handleSelectChange(el) {
+        const type = el.dataset.type;
+        const value = el.value;
+        if (type === 'kabupaten') handleKabupatenChange(value);
+        else if (type === 'kecamatan') handleKecamatanChange(value);
+        else if (type === 'desa') handleDesaChange(value);
+    }
+
     function handleProvinsiChange(kode) {
         if (!kode) return;
         showLoading();

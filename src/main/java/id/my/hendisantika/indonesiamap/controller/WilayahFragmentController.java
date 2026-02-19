@@ -35,7 +35,6 @@ public class WilayahFragmentController {
         model.addAttribute("type", "kabupaten");
         model.addAttribute("label", "Kabupaten/Kota");
         model.addAttribute("icon", "fa-city");
-        model.addAttribute("onChange", "handleKabupatenChange");
         return "fragments/select-dropdown :: dropdown";
     }
 
@@ -46,7 +45,6 @@ public class WilayahFragmentController {
         model.addAttribute("type", "kecamatan");
         model.addAttribute("label", "Kecamatan");
         model.addAttribute("icon", "fa-building");
-        model.addAttribute("onChange", "handleKecamatanChange");
         return "fragments/select-dropdown :: dropdown";
     }
 
@@ -57,7 +55,6 @@ public class WilayahFragmentController {
         model.addAttribute("type", "desa");
         model.addAttribute("label", "Desa/Kelurahan");
         model.addAttribute("icon", "fa-home");
-        model.addAttribute("onChange", "handleDesaChange");
         return "fragments/select-dropdown :: dropdown";
     }
 
