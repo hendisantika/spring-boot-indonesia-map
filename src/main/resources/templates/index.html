@@ -243,49 +243,90 @@
     const markersLayer = L.layerGroup().addTo(map);
     const boundaryLayer = L.layerGroup().addTo(map);
 
+    // Province GeoJSON data (loaded once from static file)
+    let provincesGeoJson = null;
+    let allProvincesLayer = null; // background layer showing all provinces
+    let selectedProvinceCode = null;
+
     // ===== Loading =====
-    function showLoading() {
-        document.getElementById('loading').classList.add('active');
+    function showLoading() { document.getElementById('loading').classList.add('active'); }
+    function hideLoading() { document.getElementById('loading').classList.remove('active'); }
+
+    // ===== Load Province GeoJSON =====
+    function loadProvinceGeoJson() {
+        return fetch('/geojson/indonesia-provinces.geojson')
+            .then(r => r.json())
+            .then(data => {
+                provincesGeoJson = data;
+                showAllProvinces();
+                return data;
+            });
     }
 
-    function hideLoading() {
-        document.getElementById('loading').classList.remove('active');
+    function getProvinceStyle(feature, highlight) {
+        if (highlight) {
+            return {
+                color: '#e74c3c', fillColor: '#e74c3c',
+                fillOpacity: 0.3, weight: 3
+            };
+        }
+        return {
+            color: '#3388ff', fillColor: '#3388ff',
+            fillOpacity: 0.1, weight: 1.5
+        };
     }
 
-    // ===== GeoJSON Coordinate Utilities =====
-    function getArrayDepth(arr) {
-        return Array.isArray(arr) ? 1 + Math.max(0, ...arr.map(getArrayDepth)) : 0;
-    }
+    function showAllProvinces() {
+        if (!provincesGeoJson) return;
+        boundaryLayer.clearLayers();
+        markersLayer.clearLayers();
+        selectedProvinceCode = null;
 
-    function convertToLeafletFormat(coords) {
-        const depth = getArrayDepth(coords);
-
-        function swapCoords(point) {
-            if (Array.isArray(point) && point.length >= 2 &&
-                typeof point[0] === 'number' && typeof point[1] === 'number') {
-                return [point[1], point[0]];
+        allProvincesLayer = L.geoJSON(provincesGeoJson, {
+            style: function (feature) {
+                return getProvinceStyle(feature, false);
+            },
+            onEachFeature: function (feature, layer) {
+                const props = feature.properties;
+                layer.bindPopup('<b>' + props.PROVINSI + '</b><br>Kode: ' + props.KODE_PROV);
+                layer.on('mouseover', function () {
+                    if (props.KODE_PROV !== selectedProvinceCode) {
+                        this.setStyle({ fillOpacity: 0.25, weight: 2.5 });
+                    }
+                });
+                layer.on('mouseout', function () {
+                    if (props.KODE_PROV !== selectedProvinceCode) {
+                        this.setStyle(getProvinceStyle(feature, false));
+                    }
+                });
+                layer.on('click', function () {
+                    // Select this province in dropdown and trigger change
+                    const sel = document.getElementById('provinsi-select');
+                    sel.value = props.KODE_PROV;
+                    handleProvinsiChange(props.KODE_PROV);
+                });
             }
-            return point;
-        }
+        }).addTo(boundaryLayer);
 
-        function processCoords(arr, currentDepth) {
-            if (currentDepth === 1) return swapCoords(arr);
-            if (Array.isArray(arr)) return arr.map(item => processCoords(item, currentDepth - 1));
-            return arr;
-        }
+        map.setView([-2.5489, 118.0149], 5);
+    }
 
-        // Check if coordinates need swapping (lng > 90 means GeoJSON format)
-        let firstPoint = coords;
-        while (Array.isArray(firstPoint) && firstPoint.length > 0) {
-            if (typeof firstPoint[0] === 'number' && typeof firstPoint[1] === 'number') {
-                if (Math.abs(firstPoint[0]) > 90) {
-                    return processCoords(coords, depth);
-                }
-                break;
+    function highlightProvince(code) {
+        selectedProvinceCode = code;
+        if (!provincesGeoJson || !allProvincesLayer) return null;
+
+        let targetLayer = null;
+        allProvincesLayer.eachLayer(function (layer) {
+            const props = layer.feature.properties;
+            if (props.KODE_PROV === code) {
+                layer.setStyle(getProvinceStyle(layer.feature, true));
+                layer.bringToFront();
+                targetLayer = layer;
+            } else {
+                layer.setStyle({ color: '#999', fillColor: '#999', fillOpacity: 0.05, weight: 1 });
             }
-            firstPoint = firstPoint[0];
-        }
-        return coords;
+        });
+        return targetLayer;
     }
 
     // ===== Dropdown Handlers =====
@@ -300,7 +341,8 @@
     function handleProvinsiChange(kode) {
         if (!kode) return;
         showLoading();
-        loadDetail(kode);
+        loadDetailPanel(kode);
+        showProvinceBoundary(kode);
         loadDropdown('/wilayah/kabupaten-select/' + kode, 'kabupaten-container');
         resetContainer('kecamatan-container', 'Kecamatan', 'fa-building');
         resetContainer('desa-container', 'Desa/Kelurahan', 'fa-home');
@@ -309,7 +351,8 @@
     function handleKabupatenChange(kode) {
         if (!kode) return;
         showLoading();
-        loadDetail(kode);
+        loadDetailPanel(kode);
+        zoomToSubRegion(kode, 9);
         loadDropdown('/wilayah/kecamatan-select/' + kode, 'kecamatan-container');
         resetContainer('desa-container', 'Desa/Kelurahan', 'fa-home');
     }
@@ -317,14 +360,70 @@
     function handleKecamatanChange(kode) {
         if (!kode) return;
         showLoading();
-        loadDetail(kode);
+        loadDetailPanel(kode);
+        zoomToSubRegion(kode, 11);
         loadDropdown('/wilayah/desa-select/' + kode, 'desa-container');
     }
 
     function handleDesaChange(kode) {
         if (!kode) return;
         showLoading();
-        loadDetail(kode);
+        loadDetailPanel(kode);
+        zoomToSubRegion(kode, 14);
+    }
+
+    function showProvinceBoundary(kode) {
+        const targetLayer = highlightProvince(kode);
+        markersLayer.clearLayers();
+
+        if (targetLayer) {
+            const bounds = targetLayer.getBounds();
+            const center = bounds.getCenter();
+            L.marker([center.lat, center.lng])
+                .bindPopup('<b>' + targetLayer.feature.properties.PROVINSI + '</b><br>Kode: ' + kode)
+                .addTo(markersLayer)
+                .openPopup();
+            map.fitBounds(bounds, { padding: [50, 50] });
+        }
+        hideLoading();
+    }
+
+    function zoomToSubRegion(kode, zoomLevel) {
+        // Get the province code (first 2 digits) to keep province boundary visible
+        const provCode = kode.replace(/\./g, '').substring(0, 2);
+        if (provCode !== selectedProvinceCode) {
+            highlightProvince(provCode);
+        }
+
+        // Fetch boundary data to get the center point for this region
+        fetch('/wilayah/api/boundary/' + kode)
+            .then(r => r.ok ? r.json() : null)
+            .then(data => {
+                markersLayer.clearLayers();
+
+                if (data && data.lat && data.lng) {
+                    L.marker([data.lat, data.lng])
+                        .bindPopup('<b>' + (data.nama || kode) + '</b><br>Kode: ' + kode + '<br>' + (data.level || ''))
+                        .addTo(markersLayer)
+                        .openPopup();
+                    map.setView([data.lat, data.lng], zoomLevel);
+                } else {
+                    // Fallback: zoom into the province boundary center
+                    if (allProvincesLayer) {
+                        allProvincesLayer.eachLayer(function (layer) {
+                            if (layer.feature.properties.KODE_PROV === provCode) {
+                                const center = layer.getBounds().getCenter();
+                                L.marker([center.lat, center.lng])
+                                    .bindPopup('<b>' + kode + '</b>')
+                                    .addTo(markersLayer);
+                                map.setView([center.lat, center.lng], zoomLevel);
+                            }
+                        });
+                    }
+                }
+            })
+            .catch(err => console.error('Error loading boundary:', err))
+            .finally(() => hideLoading());
     }
 
     function loadDropdown(url, containerId) {
@@ -344,111 +443,37 @@
             '<option value="">Pilih ' + label + '</option></select>';
     }
 
-    // ===== Detail & Boundary Loading =====
-    function loadDetail(kode) {
-        // Load detail panel
+    // ===== Detail Panel =====
+    function loadDetailPanel(kode) {
         fetch('/wilayah/detail/' + kode)
             .then(r => r.text())
             .then(html => {
                 document.getElementById('detail-panel').innerHTML = html;
             })
             .catch(err => console.error('Error loading detail:', err));
-
-        // Load boundary
-        fetch('/wilayah/api/boundary/' + kode)
-            .then(r => {
-                if (!r.ok) throw new Error('HTTP ' + r.status);
-                return r.json();
-            })
-            .then(data => {
-                markersLayer.clearLayers();
-                boundaryLayer.clearLayers();
-
-                // Add marker
-                if (data.lat && data.lng) {
-                    L.marker([data.lat, data.lng])
-                        .bindPopup('<b>' + data.nama + '</b><br>Kode: ' + data.kode)
-                        .addTo(markersLayer);
-                }
-
-                // Add boundary polygon
-                if (data.coordinates) {
-                    try {
-                        let coordinates = JSON.parse(data.coordinates);
-
-                        if (coordinates.type && coordinates.coordinates) {
-                            // GeoJSON geometry object
-                            const geoLayer = L.geoJSON({
-                                type: "Feature",
-                                geometry: coordinates
-                            }, {
-                                style: {
-                                    color: '#3388ff',
-                                    fillColor: '#3388ff',
-                                    fillOpacity: 0.2,
-                                    weight: 2
-                                }
-                            }).bindPopup('<b>' + data.nama + '</b><br>' + data.level)
-                              .addTo(boundaryLayer);
-                            map.fitBounds(geoLayer.getBounds(), {padding: [50, 50]});
-                        } else {
-                            // Raw coordinate array
-                            const leafletCoords = convertToLeafletFormat(coordinates);
-                            const polygon = L.polygon(leafletCoords, {
-                                color: '#3388ff',
-                                fillColor: '#3388ff',
-                                fillOpacity: 0.2,
-                                weight: 2
-                            }).bindPopup('<b>' + data.nama + '</b><br>' + data.level)
-                              .addTo(boundaryLayer);
-                            map.fitBounds(polygon.getBounds(), {padding: [50, 50]});
-                        }
-                    } catch (e) {
-                        console.error('Error parsing boundary:', e);
-                        if (data.lat && data.lng) map.setView([data.lat, data.lng], 10);
-                    }
-                } else if (data.lat && data.lng) {
-                    map.setView([data.lat, data.lng], 10);
-                }
-            })
-            .catch(err => console.error('Error loading boundary:', err))
-            .finally(() => hideLoading());
     }
 
     // ===== Map Controls =====
     function resetMapView() {
-        map.setView([-2.5489, 118.0149], 5);
         markersLayer.clearLayers();
         boundaryLayer.clearLayers();
+        showAllProvinces();
     }
 
     function showProvinces() {
-        showLoading();
-        fetch('/wilayah/api/all')
-            .then(r => r.json())
-            .then(data => {
-                markersLayer.clearLayers();
-                boundaryLayer.clearLayers();
-                data.forEach(prov => {
-                    if (prov.lat && prov.lng) {
-                        L.marker([prov.lat, prov.lng])
-                            .bindPopup('<b>' + prov.nama + '</b><br>Kode: ' + prov.kode)
-                            .addTo(markersLayer);
-                    }
-                });
-                map.setView([-2.5489, 118.0149], 5);
-            })
-            .catch(err => console.error('Error loading provinces:', err))
-            .finally(() => hideLoading());
+        markersLayer.clearLayers();
+        boundaryLayer.clearLayers();
+        showAllProvinces();
     }
 
     // Fix map rendering in flex layout
-    setTimeout(function () {
-        map.invalidateSize();
-    }, 200);
+    setTimeout(function () { map.invalidateSize(); }, 200);
 
-    // Load provinces on start
-    showProvinces();
+    // Load province GeoJSON on start
+    showLoading();
+    loadProvinceGeoJson()
+        .then(() => hideLoading())
+        .catch(() => hideLoading());
 </script>
 
 </body>
