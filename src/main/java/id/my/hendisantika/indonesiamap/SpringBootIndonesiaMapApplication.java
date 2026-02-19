@@ -1,4 +1,4 @@
-package id.my.hendisantika.ndonesiamap;
+package id.my.hendisantika.indonesiamap;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
