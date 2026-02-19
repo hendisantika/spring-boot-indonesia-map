@@ -240,332 +240,238 @@
         maxZoom: 18
     }).addTo(map);
 
-    // Layer ordering: province (bottom) -> kabupaten -> kecamatan -> desa -> markers (top)
-    const provinceLayer = L.layerGroup().addTo(map);
-    const kabupatenLayer = L.layerGroup().addTo(map);
-    const kecamatanLayer = L.layerGroup().addTo(map);
-    const desaLayer = L.layerGroup().addTo(map);
+    // Two simple layers like the reference site
     const markersLayer = L.layerGroup().addTo(map);
+    const boundaryLayer = L.layerGroup().addTo(map);
 
-    // Province GeoJSON data
-    let provincesGeoJson = null;
-    let allProvincesLayer = null;
-    let selectedProvinceCode = null;
-
-    // Sub-region state (kecamatan/desa keyed by lowercase nama for name-based matching)
-    let kabupatenLayers = {};      // kode -> layer (KEMENDAGRI codes from wilayah-boundaries.json)
-    let selectedKabupatenCode = null;
-    let kecamatanLayers = {};      // lowercase nama -> layer (matched by name, not code)
-    let selectedKecamatanName = null;
-    let desaLayers = {};           // lowercase nama -> layer (matched by name, not code)
-    let selectedDesaName = null;
-    let cachedDesaData = {};       // kabCode -> array of desa items
-
-    // Color palettes
-    const kabColors = ['#e74c3c','#3498db','#2ecc71','#f39c12','#9b59b6','#1abc9c','#e67e22','#34495e',
-        '#d35400','#27ae60','#2980b9','#8e44ad','#c0392b','#16a085','#f1c40f','#7f8c8d'];
-    const kecColors = ['#2196f3','#ff9800','#4caf50','#e91e63','#00bcd4','#ff5722','#8bc34a','#673ab7',
-        '#009688','#ffc107','#03a9f4','#cddc39','#795548','#607d8b','#f44336','#3f51b5'];
-    const desColors = ['#26a69a','#ef5350','#42a5f5','#66bb6a','#ffa726','#ab47bc','#ec407a','#7e57c2',
-        '#29b6f6','#9ccc65','#ffca28','#8d6e63','#78909c','#5c6bc0','#26c6da','#d4e157'];
+    // Cache for kecamatan/desa static boundary data
+    let cachedKecamatanData = {};
+    let cachedDesaData = {};
 
     // ===== Loading =====
     function showLoading() { document.getElementById('loading').classList.add('active'); }
     function hideLoading() { document.getElementById('loading').classList.remove('active'); }
 
-    // ===== Load Province GeoJSON =====
-    function loadProvinceGeoJson() {
-        return fetch('/geojson/indonesia-provinces.geojson')
-            .then(r => r.json())
-            .then(data => {
-                provincesGeoJson = data;
-                showAllProvinces();
-                return data;
-            });
+    // ===== Coordinate Helpers =====
+    function getArrayDepth(arr) {
+        return Array.isArray(arr) ? 1 + Math.max(0, ...arr.map(getArrayDepth)) : 0;
     }
 
-    function showAllProvinces() {
-        if (!provincesGeoJson) return;
-        provinceLayer.clearLayers();
-        kabupatenLayer.clearLayers();
-        kecamatanLayer.clearLayers();
-        desaLayer.clearLayers();
-        markersLayer.clearLayers();
-        selectedProvinceCode = null;
-        selectedKabupatenCode = null;
-        selectedKecamatanName = null;
-        selectedDesaName = null;
-        kabupatenLayers = {};
-        kecamatanLayers = {};
-        desaLayers = {};
-
-        allProvincesLayer = L.geoJSON(provincesGeoJson, {
-            style: function () {
-                return { color: '#3388ff', fillColor: '#3388ff', fillOpacity: 0.1, weight: 1.5 };
-            },
-            onEachFeature: function (feature, layer) {
-                const props = feature.properties;
-                layer.bindPopup('<b>' + props.PROVINSI + '</b><br>Kode: ' + props.KODE_PROV);
-                layer.on('mouseover', function () {
-                    if (props.KODE_PROV !== selectedProvinceCode) {
-                        this.setStyle({ fillOpacity: 0.25, weight: 2.5 });
-                    }
-                });
-                layer.on('mouseout', function () {
-                    if (props.KODE_PROV !== selectedProvinceCode) {
-                        this.setStyle({ color: '#3388ff', fillColor: '#3388ff', fillOpacity: 0.1, weight: 1.5 });
-                    }
-                });
-                layer.on('click', function () {
-                    document.getElementById('provinsi-select').value = props.KODE_PROV;
-                    handleProvinsiChange(props.KODE_PROV);
-                });
+    function convertToLeafletFormat(coords) {
+        const depth = getArrayDepth(coords);
+        function swapCoords(point) {
+            if (Array.isArray(point) && point.length === 2 &&
+                typeof point[0] === 'number' && typeof point[1] === 'number') {
+                return [point[1], point[0]];
             }
-        }).addTo(provinceLayer);
-
-        map.setView([-2.5489, 118.0149], 5);
-    }
-
-    function selectProvince(code) {
-        selectedProvinceCode = code;
-        if (!allProvincesLayer) return null;
-
-        let targetLayer = null;
-        allProvincesLayer.eachLayer(function (layer) {
-            const props = layer.feature.properties;
-            if (props.KODE_PROV === code) {
-                // Selected province: thin border only, NO fill (so kabupaten polygons show clearly)
-                layer.setStyle({ color: '#e74c3c', fillColor: 'transparent', fillOpacity: 0, weight: 2.5 });
-                layer.bringToFront();
-                targetLayer = layer;
-            } else {
-                // Other provinces: very dim
-                layer.setStyle({ color: '#ccc', fillColor: '#ccc', fillOpacity: 0.03, weight: 0.5 });
+            return point;
+        }
+        function processCoords(arr, currentDepth) {
+            if (currentDepth === 1) return swapCoords(arr);
+            if (Array.isArray(arr)) return arr.map(function (item) { return processCoords(item, currentDepth - 1); });
+            return arr;
+        }
+        // Check if coordinates need swapping (first number > 90 means it's longitude-first)
+        let firstPoint = coords;
+        while (Array.isArray(firstPoint) && firstPoint.length > 0) {
+            if (typeof firstPoint[0] === 'number' && typeof firstPoint[1] === 'number') {
+                if (Math.abs(firstPoint[0]) > 90) return processCoords(coords, depth);
+                break;
             }
-        });
-        return targetLayer;
+            firstPoint = firstPoint[0];
+        }
+        return coords;
     }
 
-    // ===== Kabupaten Boundaries =====
-    function loadKabupatenBoundaries(provinceCode) {
-        return fetch('/wilayah/api/boundaries/kabupaten/' + provinceCode)
-            .then(r => r.json())
-            .then(boundaries => {
-                // Clear INSIDE the callback to avoid race condition
-                kabupatenLayer.clearLayers();
-                kecamatanLayer.clearLayers();
-                desaLayer.clearLayers();
-                kabupatenLayers = {};
-                kecamatanLayers = {};
-                desaLayers = {};
-                selectedKabupatenCode = null;
-                selectedKecamatanName = null;
-                selectedDesaName = null;
+    // ===== Load Detail + Boundary =====
+    function loadDetail(kode) {
+        showLoading();
 
-                boundaries.forEach(function (item, idx) {
-                    if (item.path && item.path.length > 0) {
-                        const color = kabColors[idx % kabColors.length];
-                        const polygon = L.polygon(item.path, {
-                            color: color, fillColor: color,
-                            fillOpacity: 0.25, weight: 2
-                        });
-                        polygon._data = item;
-                        polygon._color = color;
-                        polygon.bindPopup('<b>' + item.nama + '</b><br>Kode: ' + item.kode);
-
-                        polygon.on('mouseover', function () {
-                            if (item.kode !== selectedKabupatenCode) {
-                                this.setStyle({ fillOpacity: 0.4, weight: 3 });
-                            }
-                        });
-                        polygon.on('mouseout', function () {
-                            if (item.kode !== selectedKabupatenCode) {
-                                this.setStyle({ fillOpacity: 0.25, weight: 2, color: color, fillColor: color });
-                            }
-                        });
-                        polygon.on('click', function () {
-                            const sel = document.getElementById('kabupaten-select');
-                            if (sel) { sel.value = item.kode; }
-                            handleKabupatenChange(item.kode);
-                        });
-
-                        polygon.addTo(kabupatenLayer);
-                        kabupatenLayers[item.kode] = polygon;
-                    }
-                });
-                console.log('Loaded ' + boundaries.length + ' kabupaten boundaries for province ' + provinceCode);
+        // Load detail panel
+        fetch('/wilayah/detail/' + kode)
+            .then(function (r) { return r.text(); })
+            .then(function (html) {
+                document.getElementById('detail-panel').innerHTML = html;
             })
-            .catch(err => console.error('Error loading kabupaten boundaries:', err));
-    }
+            .catch(function (err) { console.error('Error loading detail:', err); });
 
-    function highlightKabupaten(kode) {
-        selectedKabupatenCode = kode;
-        for (const [code, layer] of Object.entries(kabupatenLayers)) {
-            if (code === kode) {
-                layer.setStyle({ fillOpacity: 0.1, weight: 3, color: '#e74c3c', fillColor: 'transparent' });
-                layer.bringToFront();
-            } else {
-                layer.setStyle({ fillOpacity: 0.05, weight: 0.5, color: layer._color, fillColor: layer._color });
-            }
-        }
-    }
-
-    // ===== Kecamatan Boundaries (matched by name since HDX codes differ from KEMENDAGRI) =====
-    function loadKecamatanBoundaries(kabCode) {
-        return fetch('/geojson/kecamatan/' + kabCode + '.json')
-            .then(r => { if (!r.ok) throw new Error('Not found'); return r.json(); })
-            .then(boundaries => {
-                kecamatanLayer.clearLayers();
-                desaLayer.clearLayers();
-                kecamatanLayers = {};
-                desaLayers = {};
-                selectedKecamatanName = null;
-                selectedDesaName = null;
-
-                boundaries.forEach(function (item, idx) {
-                    if (item.path && item.path.length > 0) {
-                        const color = kecColors[idx % kecColors.length];
-                        const polygon = L.polygon(item.path, {
-                            color: color, fillColor: color,
-                            fillOpacity: 0.25, weight: 2
-                        });
-                        polygon._data = item;
-                        polygon._color = color;
-                        polygon.bindPopup('<b>' + item.nama + '</b><br>Kecamatan');
-
-                        const namaKey = item.nama.toLowerCase();
-                        polygon.on('mouseover', function () {
-                            if (namaKey !== selectedKecamatanName) {
-                                this.setStyle({ fillOpacity: 0.4, weight: 3 });
-                            }
-                        });
-                        polygon.on('mouseout', function () {
-                            if (namaKey !== selectedKecamatanName) {
-                                this.setStyle({ fillOpacity: 0.25, weight: 2, color: color, fillColor: color });
-                            }
-                        });
-                        polygon.on('click', function () {
-                            // Find dropdown option matching this name and select it
-                            const sel = document.getElementById('kecamatan-select');
-                            if (sel) {
-                                const matchOpt = findOptionByName(sel, item.nama);
-                                if (matchOpt) {
-                                    sel.value = matchOpt.value;
-                                    handleKecamatanChange(matchOpt.value);
-                                }
-                            }
-                        });
-
-                        polygon.addTo(kecamatanLayer);
-                        kecamatanLayers[namaKey] = polygon;
-                    }
-                });
-                console.log('Loaded ' + boundaries.length + ' kecamatan boundaries for kabupaten ' + kabCode);
-            })
-            .catch(err => console.log('No kecamatan boundaries for ' + kabCode + ': ' + err.message));
-    }
-
-    function highlightKecamatan(name) {
-        selectedKecamatanName = name;
-        for (const [key, layer] of Object.entries(kecamatanLayers)) {
-            if (key === name) {
-                layer.setStyle({ fillOpacity: 0.1, weight: 3, color: '#e74c3c', fillColor: 'transparent' });
-                layer.bringToFront();
-            } else {
-                layer.setStyle({ fillOpacity: 0.05, weight: 0.5, color: layer._color, fillColor: layer._color });
-            }
-        }
-    }
-
-    // Helper: find a <select> option by matching its text against a name (case-insensitive)
-    function findOptionByName(selectEl, name) {
-        const lowerName = name.toLowerCase();
-        for (const opt of selectEl.options) {
-            if (opt.text.toLowerCase() === lowerName) return opt;
-        }
-        // Fallback: partial match (HDX names may differ slightly)
-        for (const opt of selectEl.options) {
-            if (opt.text.toLowerCase().includes(lowerName) || lowerName.includes(opt.text.toLowerCase())) return opt;
-        }
-        return null;
-    }
-
-    // ===== Desa Boundaries (matched by parent_nama for kecamatan, nama for desa) =====
-    function loadDesaBoundaries(kabCode, kecamatanName) {
-        let loadData;
-        if (cachedDesaData[kabCode]) {
-            loadData = Promise.resolve(cachedDesaData[kabCode]);
+        // Determine admin level from code structure
+        var parts = kode.split('.');
+        if (parts.length <= 2) {
+            // Province or Kabupaten: use API
+            loadBoundaryFromApi(kode);
+        } else if (parts.length === 3) {
+            // Kecamatan: find from static file by name
+            loadKecamatanBoundary(kode);
         } else {
-            loadData = fetch('/geojson/desa/' + kabCode + '.json')
-                .then(r => { if (!r.ok) throw new Error('Not found'); return r.json(); })
-                .then(data => { cachedDesaData[kabCode] = data; return data; });
+            // Desa: find from static file by name
+            loadDesaBoundary(kode);
         }
-
-        return loadData.then(allDesa => {
-            desaLayer.clearLayers();
-            desaLayers = {};
-            selectedDesaName = null;
-
-            // Filter desa by parent_nama matching kecamatan name (case-insensitive)
-            const lowerKecName = kecamatanName.toLowerCase();
-            const filtered = allDesa.filter(d => d.parent_nama && d.parent_nama.toLowerCase() === lowerKecName);
-            filtered.forEach(function (item, idx) {
-                if (item.path && item.path.length > 0) {
-                    const color = desColors[idx % desColors.length];
-                    const polygon = L.polygon(item.path, {
-                        color: color, fillColor: color,
-                        fillOpacity: 0.25, weight: 2
-                    });
-                    polygon._data = item;
-                    polygon._color = color;
-                    polygon.bindPopup('<b>' + item.nama + '</b><br>Desa/Kelurahan');
-
-                    const namaKey = item.nama.toLowerCase();
-                    polygon.on('mouseover', function () {
-                        if (namaKey !== selectedDesaName) {
-                            this.setStyle({ fillOpacity: 0.4, weight: 3 });
-                        }
-                    });
-                    polygon.on('mouseout', function () {
-                        if (namaKey !== selectedDesaName) {
-                            this.setStyle({ fillOpacity: 0.25, weight: 2, color: color, fillColor: color });
-                        }
-                    });
-                    polygon.on('click', function () {
-                        const sel = document.getElementById('desa-select');
-                        if (sel) {
-                            const matchOpt = findOptionByName(sel, item.nama);
-                            if (matchOpt) {
-                                sel.value = matchOpt.value;
-                                handleDesaChange(matchOpt.value);
-                            }
-                        }
-                    });
-
-                    polygon.addTo(desaLayer);
-                    desaLayers[namaKey] = polygon;
-                }
-            });
-            console.log('Loaded ' + filtered.length + ' desa boundaries for kecamatan ' + kecamatanName);
-        }).catch(err => console.log('No desa boundaries for ' + kabCode + ': ' + err.message));
     }
 
-    function highlightDesa(name) {
-        selectedDesaName = name;
-        for (const [key, layer] of Object.entries(desaLayers)) {
-            if (key === name) {
-                layer.setStyle({ fillOpacity: 0.45, weight: 3.5, color: '#e74c3c', fillColor: '#e74c3c' });
-                layer.bringToFront();
-            } else {
-                layer.setStyle({ fillOpacity: 0.08, weight: 1, color: layer._color, fillColor: layer._color });
-            }
+    function loadBoundaryFromApi(kode) {
+        fetch('/wilayah/api/boundary/' + kode)
+            .then(function (r) {
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                return r.json();
+            })
+            .then(function (data) {
+                markersLayer.clearLayers();
+                boundaryLayer.clearLayers();
+
+                // Add center marker
+                if (data.lat && data.lng) {
+                    L.marker([data.lat, data.lng])
+                        .bindPopup('<b>' + data.nama + '</b><br>Kode: ' + data.kode)
+                        .addTo(markersLayer);
+                }
+
+                if (data.coordinates) {
+                    // GeoJSON geometry string (provinces)
+                    try {
+                        var geometry = JSON.parse(data.coordinates);
+                        var layer;
+                        if (geometry.type && geometry.coordinates) {
+                            layer = L.geoJSON({ type: "Feature", geometry: geometry }, {
+                                style: { color: '#3388ff', fillColor: '#3388ff', fillOpacity: 0.2, weight: 2 }
+                            }).bindPopup('<b>' + data.nama + '</b><br>' + data.level).addTo(boundaryLayer);
+                        } else {
+                            var leafletCoords = convertToLeafletFormat(geometry);
+                            layer = L.polygon(leafletCoords, {
+                                color: '#3388ff', fillColor: '#3388ff', fillOpacity: 0.2, weight: 2
+                            }).bindPopup('<b>' + data.nama + '</b><br>' + data.level).addTo(boundaryLayer);
+                        }
+                        if (layer) map.fitBounds(layer.getBounds(), { padding: [50, 50] });
+                    } catch (e) {
+                        console.error('Error parsing coordinates:', e);
+                        if (data.lat && data.lng) map.setView([data.lat, data.lng], 10);
+                    }
+                } else if (data.path) {
+                    // Polygon path array (kabupaten from wilayah-boundaries.json, already [lat,lng])
+                    var polygon = L.polygon(data.path, {
+                        color: '#3388ff', fillColor: '#3388ff', fillOpacity: 0.2, weight: 2
+                    }).bindPopup('<b>' + data.nama + '</b><br>' + data.level).addTo(boundaryLayer);
+                    map.fitBounds(polygon.getBounds(), { padding: [50, 50] });
+                } else if (data.lat && data.lng) {
+                    map.setView([data.lat, data.lng], 10);
+                }
+                hideLoading();
+            })
+            .catch(function (err) {
+                console.error('Error loading boundary:', err);
+                hideLoading();
+            });
+    }
+
+    function loadKecamatanBoundary(kode) {
+        var parts = kode.split('.');
+        var kabCode = parts[0] + '.' + parts[1];
+
+        // Get kecamatan name from dropdown
+        var sel = document.getElementById('kecamatan-select');
+        var kecName = '';
+        if (sel && sel.selectedIndex >= 0) {
+            kecName = sel.options[sel.selectedIndex].text;
         }
+
+        var fetchData = cachedKecamatanData[kabCode]
+            ? Promise.resolve(cachedKecamatanData[kabCode])
+            : fetch('/geojson/kecamatan/' + kabCode + '.json')
+                .then(function (r) { return r.ok ? r.json() : []; })
+                .then(function (data) { cachedKecamatanData[kabCode] = data; return data; });
+
+        fetchData.then(function (allKec) {
+            markersLayer.clearLayers();
+            boundaryLayer.clearLayers();
+
+            // Find kecamatan by name (case-insensitive)
+            var lowerName = kecName.toLowerCase();
+            var found = allKec.find(function (k) { return k.nama.toLowerCase() === lowerName; });
+
+            if (found && found.path && found.path.length > 0) {
+                if (found.lat && found.lng) {
+                    L.marker([found.lat, found.lng])
+                        .bindPopup('<b>' + found.nama + '</b><br>Kode: ' + kode + '<br>Kecamatan')
+                        .addTo(markersLayer);
+                }
+                var polygon = L.polygon(found.path, {
+                    color: '#3388ff', fillColor: '#3388ff', fillOpacity: 0.2, weight: 2
+                }).bindPopup('<b>' + found.nama + '</b><br>Kecamatan').addTo(boundaryLayer);
+                map.fitBounds(polygon.getBounds(), { padding: [50, 50] });
+            } else if (found && found.lat && found.lng) {
+                L.marker([found.lat, found.lng])
+                    .bindPopup('<b>' + found.nama + '</b><br>Kode: ' + kode + '<br>Kecamatan')
+                    .addTo(markersLayer);
+                map.setView([found.lat, found.lng], 12);
+            }
+            hideLoading();
+        }).catch(function (err) {
+            console.log('No kecamatan boundary for ' + kode + ': ' + err.message);
+            hideLoading();
+        });
+    }
+
+    function loadDesaBoundary(kode) {
+        var parts = kode.split('.');
+        var kabCode = parts[0] + '.' + parts[1];
+
+        // Get desa name and kecamatan name from dropdowns
+        var selDesa = document.getElementById('desa-select');
+        var desaName = '';
+        if (selDesa && selDesa.selectedIndex >= 0) {
+            desaName = selDesa.options[selDesa.selectedIndex].text;
+        }
+        var selKec = document.getElementById('kecamatan-select');
+        var kecName = '';
+        if (selKec && selKec.selectedIndex >= 0) {
+            kecName = selKec.options[selKec.selectedIndex].text;
+        }
+
+        var fetchData = cachedDesaData[kabCode]
+            ? Promise.resolve(cachedDesaData[kabCode])
+            : fetch('/geojson/desa/' + kabCode + '.json')
+                .then(function (r) { return r.ok ? r.json() : []; })
+                .then(function (data) { cachedDesaData[kabCode] = data; return data; });
+
+        fetchData.then(function (allDesa) {
+            markersLayer.clearLayers();
+            boundaryLayer.clearLayers();
+
+            // Find desa by name + parent_nama matching kecamatan (case-insensitive)
+            var lowerDesaName = desaName.toLowerCase();
+            var lowerKecName = kecName.toLowerCase();
+            var found = allDesa.find(function (d) {
+                return d.nama.toLowerCase() === lowerDesaName &&
+                    (!lowerKecName || (d.parent_nama && d.parent_nama.toLowerCase() === lowerKecName));
+            });
+
+            if (found && found.path && found.path.length > 0) {
+                if (found.lat && found.lng) {
+                    L.marker([found.lat, found.lng])
+                        .bindPopup('<b>' + found.nama + '</b><br>Kode: ' + kode + '<br>Desa/Kelurahan')
+                        .addTo(markersLayer);
+                }
+                var polygon = L.polygon(found.path, {
+                    color: '#3388ff', fillColor: '#3388ff', fillOpacity: 0.2, weight: 2
+                }).bindPopup('<b>' + found.nama + '</b><br>Desa/Kelurahan').addTo(boundaryLayer);
+                map.fitBounds(polygon.getBounds(), { padding: [50, 50] });
+            } else if (found && found.lat && found.lng) {
+                L.marker([found.lat, found.lng])
+                    .bindPopup('<b>' + found.nama + '</b><br>Kode: ' + kode + '<br>Desa/Kelurahan')
+                    .addTo(markersLayer);
+                map.setView([found.lat, found.lng], 15);
+            }
+            hideLoading();
+        }).catch(function (err) {
+            console.log('No desa boundary for ' + kode + ': ' + err.message);
+            hideLoading();
+        });
     }
 
     // ===== Dropdown Handlers =====
     function handleSelectChange(el) {
-        const type = el.dataset.type;
-        const value = el.value;
+        var type = el.dataset.type;
+        var value = el.value;
         if (type === 'kabupaten') handleKabupatenChange(value);
         else if (type === 'kecamatan') handleKecamatanChange(value);
         else if (type === 'desa') handleDesaChange(value);
@@ -573,22 +479,7 @@
 
     function handleProvinsiChange(kode) {
         if (!kode) return;
-        showLoading();
-        loadDetailPanel(kode);
-
-        // Select province: thin red border, no fill
-        const targetLayer = selectProvince(kode);
-        markersLayer.clearLayers();
-
-        if (targetLayer) {
-            map.fitBounds(targetLayer.getBounds(), { padding: [50, 50] });
-        }
-
-        // Load kabupaten boundaries (they show clearly since province has no fill)
-        loadKabupatenBoundaries(kode)
-            .then(() => hideLoading())
-            .catch(() => hideLoading());
-
+        loadDetail(kode);
         loadDropdown('/wilayah/kabupaten-select/' + kode, 'kabupaten-container');
         resetContainer('kecamatan-container', 'Kecamatan', 'fa-building');
         resetContainer('desa-container', 'Desa/Kelurahan', 'fa-home');
@@ -596,159 +487,72 @@
 
     function handleKabupatenChange(kode) {
         if (!kode) return;
-        showLoading();
-        loadDetailPanel(kode);
-
-        // Highlight kabupaten (thin red border, others dim)
-        highlightKabupaten(kode);
-
-        // Zoom to kabupaten and show kecamatan boundaries
-        const kabLayer = kabupatenLayers[kode];
-        if (kabLayer) {
-            map.fitBounds(kabLayer.getBounds(), { padding: [30, 30] });
-            markersLayer.clearLayers();
-        }
-
-        // Load kecamatan boundaries for this kabupaten
-        loadKecamatanBoundaries(kode)
-            .then(() => hideLoading())
-            .catch(() => hideLoading());
-
+        loadDetail(kode);
         loadDropdown('/wilayah/kecamatan-select/' + kode, 'kecamatan-container');
         resetContainer('desa-container', 'Desa/Kelurahan', 'fa-home');
     }
 
     function handleKecamatanChange(kode) {
         if (!kode) return;
-        showLoading();
-        loadDetailPanel(kode);
-
-        // Get the selected option's text (name) to find the boundary layer by name
-        const sel = document.getElementById('kecamatan-select');
-        let kecName = '';
-        if (sel && sel.selectedIndex >= 0) {
-            kecName = sel.options[sel.selectedIndex].text;
-        }
-
-        // Highlight kecamatan by name (thin red border, others dim)
-        const nameKey = kecName.toLowerCase();
-        highlightKecamatan(nameKey);
-
-        // Zoom to kecamatan
-        const kecLayer = kecamatanLayers[nameKey];
-        if (kecLayer) {
-            map.fitBounds(kecLayer.getBounds(), { padding: [30, 30] });
-            markersLayer.clearLayers();
-        }
-
-        // Load desa boundaries using kabupaten code and kecamatan name
-        const parts = kode.split('.');
-        const kabCode = parts[0] + '.' + parts[1];
-        loadDesaBoundaries(kabCode, kecName)
-            .then(() => hideLoading())
-            .catch(() => hideLoading());
-
+        loadDetail(kode);
         loadDropdown('/wilayah/desa-select/' + kode, 'desa-container');
     }
 
     function handleDesaChange(kode) {
         if (!kode) return;
-        showLoading();
-        loadDetailPanel(kode);
-
-        // Get the selected option's text (name) to find the boundary layer by name
-        const sel = document.getElementById('desa-select');
-        let desName = '';
-        if (sel && sel.selectedIndex >= 0) {
-            desName = sel.options[sel.selectedIndex].text;
-        }
-
-        // Highlight desa by name
-        const nameKey = desName.toLowerCase();
-        highlightDesa(nameKey);
-
-        // Zoom to desa boundary
-        const desLayer = desaLayers[nameKey];
-        if (desLayer) {
-            map.fitBounds(desLayer.getBounds(), { padding: [20, 20] });
-            markersLayer.clearLayers();
-            const center = desLayer.getBounds().getCenter();
-            L.marker([center.lat, center.lng])
-                .bindPopup('<b>' + desLayer._data.nama + '</b><br>Desa/Kelurahan')
-                .addTo(markersLayer)
-                .openPopup();
-        } else {
-            // Fallback: use API for center point
-            fetch('/wilayah/api/boundary/' + kode)
-                .then(r => r.ok ? r.json() : null)
-                .then(data => {
-                    markersLayer.clearLayers();
-                    if (data && data.lat && data.lng) {
-                        L.marker([data.lat, data.lng])
-                            .bindPopup('<b>' + (data.nama || desName) + '</b><br>Desa/Kelurahan')
-                            .addTo(markersLayer)
-                            .openPopup();
-                        map.setView([data.lat, data.lng], 15);
-                    }
-                })
-                .catch(err => console.error('Error:', err));
-        }
-        hideLoading();
+        loadDetail(kode);
     }
 
     function loadDropdown(url, containerId) {
         fetch(url)
-            .then(r => r.text())
-            .then(html => {
+            .then(function (r) { return r.text(); })
+            .then(function (html) {
                 document.getElementById(containerId).innerHTML = html;
             })
-            .catch(err => console.error('Error loading dropdown:', err));
+            .catch(function (err) { console.error('Error loading dropdown:', err); });
     }
 
     function resetContainer(containerId, label, icon) {
-        const typeId = containerId.replace('-container', '-select');
+        var typeId = containerId.replace('-container', '-select');
         document.getElementById(containerId).innerHTML =
             '<label class="w3-text-theme"><b><i class="fa ' + icon + '"></i> ' + label + '</b></label>' +
             '<select class="w3-select w3-border w3-round w3-margin-bottom" id="' + typeId + '" disabled>' +
             '<option value="">Pilih ' + label + '</option></select>';
     }
 
-    // ===== Detail Panel =====
-    function loadDetailPanel(kode) {
-        fetch('/wilayah/detail/' + kode)
-            .then(r => r.text())
-            .then(html => {
-                document.getElementById('detail-panel').innerHTML = html;
-            })
-            .catch(err => console.error('Error loading detail:', err));
-    }
-
     // ===== Map Controls =====
     function resetMapView() {
+        map.setView([-2.5489, 118.0149], 5);
         markersLayer.clearLayers();
-        provinceLayer.clearLayers();
-        kabupatenLayer.clearLayers();
-        kecamatanLayer.clearLayers();
-        desaLayer.clearLayers();
-        kabupatenLayers = {};
-        kecamatanLayers = {};
-        desaLayers = {};
+        boundaryLayer.clearLayers();
+        cachedKecamatanData = {};
         cachedDesaData = {};
-        showAllProvinces();
     }
 
     function showProvinces() {
-        resetMapView();
+        markersLayer.clearLayers();
+        boundaryLayer.clearLayers();
+        fetch('/wilayah/api/all')
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                var provinces = data.filter(function (w) { return w.kode.length === 2; });
+                provinces.forEach(function (prov) {
+                    if (prov.lat && prov.lng) {
+                        L.marker([prov.lat, prov.lng])
+                            .bindPopup('<b>' + prov.nama + '</b><br>Kode: ' + prov.kode +
+                                (prov.ibukota ? '<br>Ibukota: ' + prov.ibukota : ''))
+                            .addTo(markersLayer);
+                    }
+                });
+                map.setView([-2.5489, 118.0149], 5);
+            });
     }
 
     // Fix map rendering in flex layout
     setTimeout(function () { map.invalidateSize(); }, 200);
 
-    // Load province GeoJSON on start
-    showLoading();
-    loadProvinceGeoJson()
-        .then(() => hideLoading())
-        .catch(() => hideLoading());
+    // Show province markers on start (like reference site)
+    showProvinces();
 </script>
 
 </body>
