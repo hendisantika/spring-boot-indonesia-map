@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="pin" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3f51b5"/>
+      <stop offset="100%" stop-color="#1a237e"/>
+    </linearGradient>
+  </defs>
+  <!-- Map pin -->
+  <path d="M32 4C21.5 4 13 12.5 13 23c0 14.4 19 35 19 35s19-20.6 19-35C51 12.5 42.5 4 32 4z" fill="url(#pin)"/>
+  <!-- Inner circle -->
+  <circle cx="32" cy="22" r="9" fill="#fff"/>
+  <!-- Indonesia silhouette (simplified) -->
+  <path d="M25 20h2l1 2h3l2-1h4l1 1h1v2l-2 1h-3l-1-1h-2l-2 1h-3l-1-1v-2z" fill="#e53935" opacity="0.9"/>
+</svg>
