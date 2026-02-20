@@ -1,0 +1,9 @@
+services:
+  indonesia-maps2:
+    image: hendisantika/indonesia-maps2:${IMAGE_TAG:-latest}
+    container_name: indonesia-maps2
+    environment:
+      - SPRING_PROFILES_ACTIVE=dev
+    ports:
+      - "8070:8070"
+    restart: unless-stopped

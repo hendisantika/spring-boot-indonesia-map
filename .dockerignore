@@ -1,0 +1,10 @@
+.git
+.gitignore
+target/
+*.md
+*.py
+.idea/
+*.iml
+.vscode/
+.DS_Store
+nginx/
