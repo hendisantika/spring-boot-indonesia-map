@@ -59,7 +59,7 @@ jobs:
           target: "/home/deployer/indonesia-maps2"
 
       - name: Deploy to dev server
-        uses: appleboy/ssh-action@v1.2.0
+        uses: appleboy/ssh-action@v1.2.5
         with:
           host: 103.31.204.189
           username: deployer
