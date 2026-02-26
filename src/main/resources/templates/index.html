@@ -638,6 +638,9 @@
         boundaryLayer.clearLayers();
         cachedKecamatanData = {};
         cachedDesaData = {};
+        // Reset pin form and pin mode
+        cancelPinForm();
+        if (pinMode) togglePinMode();
     }
 
     function showProvinces() {
