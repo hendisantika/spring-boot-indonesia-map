@@ -391,6 +391,13 @@
         return coords;
     }
 
+    // ===== Pin Popup Helper =====
+    function pinButton(lat, lng, name) {
+        return '<br><button onclick="addPinFromMap(' + lat + ',' + lng + ',\'' + name.replace(/'/g, "\\'") + '\')" ' +
+            'style="margin-top:6px;padding:3px 10px;background:#3f51b5;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:0.85em;">' +
+            '<i class="fa fa-thumbtack"></i> Add Pin</button>';
+    }
+
     // ===== Load Detail + Boundary =====
     function loadDetail(kode) {
         showLoading();
@@ -430,7 +437,7 @@
                 // Add center marker
                 if (data.lat && data.lng) {
                     L.marker([data.lat, data.lng])
-                        .bindPopup('<b>' + data.nama + '</b><br>Kode: ' + data.kode)
+                        .bindPopup('<b>' + data.nama + '</b><br>Kode: ' + data.kode + pinButton(data.lat, data.lng, data.nama))
                         .addTo(markersLayer);
                 }
 
@@ -442,12 +449,12 @@
                         if (geometry.type && geometry.coordinates) {
                             layer = L.geoJSON({ type: "Feature", geometry: geometry }, {
                                 style: { color: '#3388ff', fillColor: '#3388ff', fillOpacity: 0.2, weight: 2 }
-                            }).bindPopup('<b>' + data.nama + '</b><br>' + data.level).addTo(boundaryLayer);
+                            }).bindPopup('<b>' + data.nama + '</b><br>' + data.level + (data.lat && data.lng ? pinButton(data.lat, data.lng, data.nama) : '')).addTo(boundaryLayer);
                         } else {
                             var leafletCoords = convertToLeafletFormat(geometry);
                             layer = L.polygon(leafletCoords, {
                                 color: '#3388ff', fillColor: '#3388ff', fillOpacity: 0.2, weight: 2
-                            }).bindPopup('<b>' + data.nama + '</b><br>' + data.level).addTo(boundaryLayer);
+                            }).bindPopup('<b>' + data.nama + '</b><br>' + data.level + (data.lat && data.lng ? pinButton(data.lat, data.lng, data.nama) : '')).addTo(boundaryLayer);
                         }
                         if (layer) map.fitBounds(layer.getBounds(), { padding: [50, 50] });
                     } catch (e) {
@@ -458,7 +465,7 @@
                     // Polygon path array (kabupaten from wilayah-boundaries.json, already [lat,lng])
                     var polygon = L.polygon(data.path, {
                         color: '#3388ff', fillColor: '#3388ff', fillOpacity: 0.2, weight: 2
-                    }).bindPopup('<b>' + data.nama + '</b><br>' + data.level).addTo(boundaryLayer);
+                    }).bindPopup('<b>' + data.nama + '</b><br>' + data.level + (data.lat && data.lng ? pinButton(data.lat, data.lng, data.nama) : '')).addTo(boundaryLayer);
                     map.fitBounds(polygon.getBounds(), { padding: [50, 50] });
                 } else if (data.lat && data.lng) {
                     map.setView([data.lat, data.lng], 10);
@@ -499,16 +506,16 @@
             if (found && found.path && found.path.length > 0) {
                 if (found.lat && found.lng) {
                     L.marker([found.lat, found.lng])
-                        .bindPopup('<b>' + found.nama + '</b><br>Kode: ' + kode + '<br>Kecamatan')
+                        .bindPopup('<b>' + found.nama + '</b><br>Kode: ' + kode + '<br>Kecamatan' + pinButton(found.lat, found.lng, found.nama))
                         .addTo(markersLayer);
                 }
                 var polygon = L.polygon(found.path, {
                     color: '#3388ff', fillColor: '#3388ff', fillOpacity: 0.2, weight: 2
-                }).bindPopup('<b>' + found.nama + '</b><br>Kecamatan').addTo(boundaryLayer);
+                }).bindPopup('<b>' + found.nama + '</b><br>Kecamatan' + (found.lat && found.lng ? pinButton(found.lat, found.lng, found.nama) : '')).addTo(boundaryLayer);
                 map.fitBounds(polygon.getBounds(), { padding: [50, 50] });
             } else if (found && found.lat && found.lng) {
                 L.marker([found.lat, found.lng])
-                    .bindPopup('<b>' + found.nama + '</b><br>Kode: ' + kode + '<br>Kecamatan')
+                    .bindPopup('<b>' + found.nama + '</b><br>Kode: ' + kode + '<br>Kecamatan' + pinButton(found.lat, found.lng, found.nama))
                     .addTo(markersLayer);
                 map.setView([found.lat, found.lng], 12);
             }
@@ -556,16 +563,16 @@
             if (found && found.path && found.path.length > 0) {
                 if (found.lat && found.lng) {
                     L.marker([found.lat, found.lng])
-                        .bindPopup('<b>' + found.nama + '</b><br>Kode: ' + kode + '<br>Desa/Kelurahan')
+                        .bindPopup('<b>' + found.nama + '</b><br>Kode: ' + kode + '<br>Desa/Kelurahan' + pinButton(found.lat, found.lng, found.nama))
                         .addTo(markersLayer);
                 }
                 var polygon = L.polygon(found.path, {
                     color: '#3388ff', fillColor: '#3388ff', fillOpacity: 0.2, weight: 2
-                }).bindPopup('<b>' + found.nama + '</b><br>Desa/Kelurahan').addTo(boundaryLayer);
+                }).bindPopup('<b>' + found.nama + '</b><br>Desa/Kelurahan' + (found.lat && found.lng ? pinButton(found.lat, found.lng, found.nama) : '')).addTo(boundaryLayer);
                 map.fitBounds(polygon.getBounds(), { padding: [50, 50] });
             } else if (found && found.lat && found.lng) {
                 L.marker([found.lat, found.lng])
-                    .bindPopup('<b>' + found.nama + '</b><br>Kode: ' + kode + '<br>Desa/Kelurahan')
+                    .bindPopup('<b>' + found.nama + '</b><br>Kode: ' + kode + '<br>Desa/Kelurahan' + pinButton(found.lat, found.lng, found.nama))
                     .addTo(markersLayer);
                 map.setView([found.lat, found.lng], 15);
             }
@@ -662,7 +669,8 @@
                     if (prov.lat && prov.lng) {
                         L.marker([prov.lat, prov.lng])
                             .bindPopup('<b>' + prov.nama + '</b><br>Kode: ' + prov.kode +
-                                (prov.ibukota ? '<br>Ibukota: ' + prov.ibukota : ''))
+                                (prov.ibukota ? '<br>Ibukota: ' + prov.ibukota : '') +
+                                pinButton(prov.lat, prov.lng, prov.nama))
                             .addTo(markersLayer);
                     }
                 });
@@ -703,11 +711,12 @@
         selectedPinColor = el.getAttribute('data-color');
     }
 
-    function addPinFromMap(lat, lng) {
+    function addPinFromMap(lat, lng, name) {
         map.closePopup();
         clearPinForm();
         document.getElementById('pin-lat').value = lat;
         document.getElementById('pin-lng').value = lng;
+        if (name) document.getElementById('pin-name').value = name;
         document.getElementById('pin-edit-id').value = '';
         document.getElementById('pin-save-label').textContent = 'Save';
         document.getElementById('pin-form-panel').style.display = 'block';
