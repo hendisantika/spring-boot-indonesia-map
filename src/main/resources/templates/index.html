@@ -641,6 +641,18 @@
         // Reset pin form and pin mode
         cancelPinForm();
         if (pinMode) togglePinMode();
+        // Reset wilayah dropdowns
+        document.getElementById('provinsi-select').value = '';
+        resetContainer('kabupaten-container', 'Kabupaten/Kota', 'fa-city');
+        resetContainer('kecamatan-container', 'Kecamatan', 'fa-building');
+        resetContainer('desa-container', 'Desa/Kelurahan', 'fa-home');
+        // Reset detail panel
+        document.getElementById('detail-panel').innerHTML =
+            '<div class="w3-container w3-theme-d1" style="border-radius: 8px 8px 0 0;">' +
+            '<h4><i class="fa fa-info-circle"></i> Detail Wilayah</h4></div>' +
+            '<div class="w3-container w3-padding w3-center w3-text-grey">' +
+            '<i class="fa fa-map-marked-alt fa-3x w3-margin-bottom" style="opacity:0.3;"></i>' +
+            '<p>Pilih wilayah untuk melihat detail</p></div>';
     }
 
     function showProvinces() {
