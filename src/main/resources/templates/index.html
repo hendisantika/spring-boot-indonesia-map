@@ -50,6 +50,44 @@
             animation: spin 0.8s linear infinite;
         }
         @keyframes spin { to { transform: rotate(360deg); } }
+        .pin-list-item {
+            display: flex; align-items: center; gap: 8px;
+            padding: 8px; border-bottom: 1px solid #eee; cursor: pointer;
+            transition: background 0.2s;
+        }
+        .pin-list-item:hover { background: #f5f5f5; }
+        .pin-color-dot {
+            width: 14px; height: 14px; border-radius: 50%;
+            flex-shrink: 0; border: 1px solid rgba(0,0,0,0.2);
+        }
+        .pin-list-item .pin-info { flex: 1; min-width: 0; }
+        .pin-list-item .pin-info .pin-name {
+            font-weight: bold; font-size: 0.9em;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .pin-list-item .pin-info .pin-cat {
+            font-size: 0.75em; color: #888;
+        }
+        .pin-actions { display: flex; gap: 4px; flex-shrink: 0; }
+        .pin-actions button {
+            background: none; border: none; cursor: pointer;
+            padding: 4px 6px; border-radius: 4px; font-size: 0.85em;
+        }
+        .pin-actions button:hover { background: #e0e0e0; }
+        .pin-form-group { margin-bottom: 10px; }
+        .pin-form-group label { display: block; font-size: 0.85em; margin-bottom: 3px; font-weight: bold; }
+        .pin-form-group input, .pin-form-group select, .pin-form-group textarea {
+            width: 100%; padding: 6px 8px; border: 1px solid #ccc; border-radius: 4px;
+            font-size: 0.9em; box-sizing: border-box;
+        }
+        .pin-form-group textarea { resize: vertical; min-height: 50px; }
+        .color-options { display: flex; gap: 6px; flex-wrap: wrap; }
+        .color-option {
+            width: 28px; height: 28px; border-radius: 50%; cursor: pointer;
+            border: 2px solid transparent; transition: transform 0.2s;
+        }
+        .color-option:hover { transform: scale(1.2); }
+        .color-option.selected { border-color: #333; }
         @media (max-width: 768px) {
             .sidebar { min-width: 100%; max-width: 100%; }
             #map { height: 400px; }
@@ -81,6 +119,9 @@
         </a>
         <a class="w3-bar-item w3-button" onclick="showProvinces()">
             <i class="fa fa-map-marker-alt"></i> Show Provinces
+        </a>
+        <a class="w3-bar-item w3-button" onclick="togglePinMode()">
+            <i class="fa fa-thumbtack"></i> <span id="pin-mode-label">Pin Mode</span>
         </a>
     </div>
 </nav>
@@ -172,6 +213,75 @@
             <div class="w3-container w3-padding w3-center w3-text-grey">
                 <i class="fa fa-map-marked-alt fa-3x w3-margin-bottom" style="opacity:0.3;"></i>
                 <p>Pilih wilayah untuk melihat detail</p>
+            </div>
+        </div>
+
+        <!-- Pinned Places Panel -->
+        <div class="w3-card w3-white w3-round-large w3-margin-bottom card-hover">
+            <div class="w3-container w3-theme-d1" style="border-radius: 8px 8px 0 0; display:flex; justify-content:space-between; align-items:center;">
+                <h4><i class="fa fa-thumbtack"></i> Pinned Places</h4>
+                <button class="w3-button w3-tiny w3-round w3-theme-action" onclick="showPinForm()" title="Add pin manually">
+                    <i class="fa fa-plus"></i>
+                </button>
+            </div>
+            <!-- Add Pin Form (hidden by default) -->
+            <div id="pin-form-panel" class="w3-container w3-padding" style="display:none; border-bottom:1px solid #eee;">
+                <div class="pin-form-group">
+                    <label><i class="fa fa-tag"></i> Name</label>
+                    <input type="text" id="pin-name" placeholder="Place name">
+                </div>
+                <div class="pin-form-group">
+                    <label><i class="fa fa-align-left"></i> Description</label>
+                    <textarea id="pin-description" placeholder="Description (optional)"></textarea>
+                </div>
+                <div style="display:flex; gap:8px;">
+                    <div class="pin-form-group" style="flex:1;">
+                        <label><i class="fa fa-arrows-alt-v"></i> Latitude</label>
+                        <input type="number" id="pin-lat" step="any" placeholder="-6.2088">
+                    </div>
+                    <div class="pin-form-group" style="flex:1;">
+                        <label><i class="fa fa-arrows-alt-h"></i> Longitude</label>
+                        <input type="number" id="pin-lng" step="any" placeholder="106.8456">
+                    </div>
+                </div>
+                <div class="pin-form-group">
+                    <label><i class="fa fa-folder"></i> Category</label>
+                    <select id="pin-category">
+                        <option value="general">General</option>
+                        <option value="restaurant">Restaurant</option>
+                        <option value="hotel">Hotel</option>
+                        <option value="tourism">Tourism</option>
+                        <option value="office">Office</option>
+                        <option value="school">School</option>
+                        <option value="hospital">Hospital</option>
+                    </select>
+                </div>
+                <div class="pin-form-group">
+                    <label><i class="fa fa-palette"></i> Color</label>
+                    <div class="color-options" id="pin-color-options">
+                        <span class="color-option selected" data-color="#e74c3c" style="background:#e74c3c;" onclick="selectPinColor(this)"></span>
+                        <span class="color-option" data-color="#3498db" style="background:#3498db;" onclick="selectPinColor(this)"></span>
+                        <span class="color-option" data-color="#2ecc71" style="background:#2ecc71;" onclick="selectPinColor(this)"></span>
+                        <span class="color-option" data-color="#f39c12" style="background:#f39c12;" onclick="selectPinColor(this)"></span>
+                        <span class="color-option" data-color="#9b59b6" style="background:#9b59b6;" onclick="selectPinColor(this)"></span>
+                        <span class="color-option" data-color="#1abc9c" style="background:#1abc9c;" onclick="selectPinColor(this)"></span>
+                        <span class="color-option" data-color="#e67e22" style="background:#e67e22;" onclick="selectPinColor(this)"></span>
+                        <span class="color-option" data-color="#34495e" style="background:#34495e;" onclick="selectPinColor(this)"></span>
+                    </div>
+                </div>
+                <input type="hidden" id="pin-edit-id" value="">
+                <div style="display:flex; gap:8px;">
+                    <button class="w3-button w3-theme w3-round w3-small" style="flex:1;" onclick="savePin()">
+                        <i class="fa fa-save"></i> <span id="pin-save-label">Save</span>
+                    </button>
+                    <button class="w3-button w3-light-grey w3-round w3-small" onclick="cancelPinForm()">
+                        <i class="fa fa-times"></i> Cancel
+                    </button>
+                </div>
+            </div>
+            <!-- Pin List -->
+            <div id="pin-list" class="w3-container" style="max-height:300px; overflow-y:auto;">
+                <p class="w3-center w3-text-grey w3-small w3-padding"><i class="fa fa-info-circle"></i> No pins yet. Click the map or use + to add.</p>
             </div>
         </div>
 
@@ -554,6 +664,195 @@
 
     // Show province markers on start (like reference site)
     showProvinces();
+
+    // ===== Pinned Places =====
+    var pinMode = false;
+    var pinsLayer = L.layerGroup().addTo(map);
+    var selectedPinColor = '#e74c3c';
+
+    function togglePinMode() {
+        pinMode = !pinMode;
+        var label = document.getElementById('pin-mode-label');
+        if (pinMode) {
+            label.textContent = 'Pin Mode ON';
+            map.getContainer().style.cursor = 'crosshair';
+        } else {
+            label.textContent = 'Pin Mode';
+            map.getContainer().style.cursor = '';
+        }
+    }
+
+    map.on('click', function (e) {
+        if (!pinMode) return;
+        document.getElementById('pin-lat').value = e.latlng.lat.toFixed(6);
+        document.getElementById('pin-lng').value = e.latlng.lng.toFixed(6);
+        document.getElementById('pin-edit-id').value = '';
+        document.getElementById('pin-save-label').textContent = 'Save';
+        document.getElementById('pin-form-panel').style.display = 'block';
+    });
+
+    function selectPinColor(el) {
+        document.querySelectorAll('#pin-color-options .color-option').forEach(function (c) {
+            c.classList.remove('selected');
+        });
+        el.classList.add('selected');
+        selectedPinColor = el.getAttribute('data-color');
+    }
+
+    function showPinForm() {
+        document.getElementById('pin-form-panel').style.display = 'block';
+        document.getElementById('pin-edit-id').value = '';
+        document.getElementById('pin-save-label').textContent = 'Save';
+        clearPinForm();
+    }
+
+    function cancelPinForm() {
+        document.getElementById('pin-form-panel').style.display = 'none';
+        clearPinForm();
+    }
+
+    function clearPinForm() {
+        document.getElementById('pin-name').value = '';
+        document.getElementById('pin-description').value = '';
+        document.getElementById('pin-lat').value = '';
+        document.getElementById('pin-lng').value = '';
+        document.getElementById('pin-category').value = 'general';
+        document.getElementById('pin-edit-id').value = '';
+        document.querySelectorAll('#pin-color-options .color-option').forEach(function (c) {
+            c.classList.remove('selected');
+        });
+        document.querySelector('#pin-color-options .color-option[data-color="#e74c3c"]').classList.add('selected');
+        selectedPinColor = '#e74c3c';
+    }
+
+    function savePin() {
+        var name = document.getElementById('pin-name').value.trim();
+        var lat = parseFloat(document.getElementById('pin-lat').value);
+        var lng = parseFloat(document.getElementById('pin-lng').value);
+        if (!name || isNaN(lat) || isNaN(lng)) {
+            alert('Name, latitude, and longitude are required.');
+            return;
+        }
+
+        var pin = {
+            name: name,
+            latitude: lat,
+            longitude: lng,
+            description: document.getElementById('pin-description').value.trim(),
+            category: document.getElementById('pin-category').value,
+            color: selectedPinColor
+        };
+
+        var editId = document.getElementById('pin-edit-id').value;
+        var url = '/api/pins';
+        var method = 'POST';
+        if (editId) {
+            url = '/api/pins/' + editId;
+            method = 'PUT';
+        }
+
+        fetch(url, {
+            method: method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(pin)
+        })
+        .then(function (r) { return r.json(); })
+        .then(function () {
+            cancelPinForm();
+            loadPins();
+            if (pinMode) togglePinMode();
+        })
+        .catch(function (err) { console.error('Error saving pin:', err); });
+    }
+
+    function editPin(id) {
+        fetch('/api/pins/' + id)
+            .then(function (r) { return r.json(); })
+            .then(function (pin) {
+                document.getElementById('pin-name').value = pin.name;
+                document.getElementById('pin-description').value = pin.description || '';
+                document.getElementById('pin-lat').value = pin.latitude;
+                document.getElementById('pin-lng').value = pin.longitude;
+                document.getElementById('pin-category').value = pin.category || 'general';
+                document.getElementById('pin-edit-id').value = pin.id;
+                document.getElementById('pin-save-label').textContent = 'Update';
+
+                // Select color
+                selectedPinColor = pin.color || '#e74c3c';
+                document.querySelectorAll('#pin-color-options .color-option').forEach(function (c) {
+                    c.classList.remove('selected');
+                    if (c.getAttribute('data-color') === selectedPinColor) c.classList.add('selected');
+                });
+
+                document.getElementById('pin-form-panel').style.display = 'block';
+            });
+    }
+
+    function deletePin(id) {
+        if (!confirm('Delete this pin?')) return;
+        fetch('/api/pins/' + id, { method: 'DELETE' })
+            .then(function () { loadPins(); })
+            .catch(function (err) { console.error('Error deleting pin:', err); });
+    }
+
+    function flyToPin(lat, lng) {
+        map.setView([lat, lng], 13);
+    }
+
+    function createPinIcon(color) {
+        return L.divIcon({
+            className: '',
+            html: '<div style="width:24px;height:24px;position:relative;">' +
+                  '<svg viewBox="0 0 24 36" width="24" height="36">' +
+                  '<path d="M12 0C5.4 0 0 5.4 0 12c0 9 12 24 12 24s12-15 12-24C24 5.4 18.6 0 12 0z" fill="' + color + '" stroke="#fff" stroke-width="1.5"/>' +
+                  '<circle cx="12" cy="12" r="5" fill="#fff"/>' +
+                  '</svg></div>',
+            iconSize: [24, 36],
+            iconAnchor: [12, 36],
+            popupAnchor: [0, -36]
+        });
+    }
+
+    function loadPins() {
+        pinsLayer.clearLayers();
+        fetch('/api/pins')
+            .then(function (r) { return r.json(); })
+            .then(function (pins) {
+                var listEl = document.getElementById('pin-list');
+                if (pins.length === 0) {
+                    listEl.innerHTML = '<p class="w3-center w3-text-grey w3-small w3-padding"><i class="fa fa-info-circle"></i> No pins yet. Click the map or use + to add.</p>';
+                    return;
+                }
+
+                var html = '';
+                pins.forEach(function (pin) {
+                    // Add marker to map
+                    var icon = createPinIcon(pin.color || '#e74c3c');
+                    L.marker([pin.latitude, pin.longitude], { icon: icon })
+                        .bindPopup('<b>' + pin.name + '</b>' +
+                            (pin.description ? '<br>' + pin.description : '') +
+                            '<br><small>' + (pin.category || 'general') + '</small>')
+                        .addTo(pinsLayer);
+
+                    // Build list item
+                    html += '<div class="pin-list-item" onclick="flyToPin(' + pin.latitude + ',' + pin.longitude + ')">' +
+                        '<span class="pin-color-dot" style="background:' + (pin.color || '#e74c3c') + ';"></span>' +
+                        '<div class="pin-info">' +
+                        '<div class="pin-name">' + pin.name + '</div>' +
+                        '<div class="pin-cat">' + (pin.category || 'general') + '</div>' +
+                        '</div>' +
+                        '<div class="pin-actions">' +
+                        '<button onclick="event.stopPropagation();editPin(\'' + pin.id + '\')" title="Edit"><i class="fa fa-pen"></i></button>' +
+                        '<button onclick="event.stopPropagation();deletePin(\'' + pin.id + '\')" title="Delete"><i class="fa fa-trash"></i></button>' +
+                        '</div></div>';
+                });
+                listEl.innerHTML = html;
+            })
+            .catch(function (err) { console.error('Error loading pins:', err); });
+    }
+
+    // Load pins on startup
+    loadPins();
 </script>
 
 </body>
