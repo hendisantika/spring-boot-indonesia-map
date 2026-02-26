@@ -120,9 +120,6 @@
         <a class="w3-bar-item w3-button" onclick="showProvinces()">
             <i class="fa fa-map-marker-alt"></i> Show Provinces
         </a>
-        <a class="w3-bar-item w3-button" onclick="togglePinMode()">
-            <i class="fa fa-thumbtack"></i> <span id="pin-mode-label">Pin Mode</span>
-        </a>
     </div>
 </nav>
 
@@ -237,11 +234,11 @@
                 <div style="display:flex; gap:8px;">
                     <div class="pin-form-group" style="flex:1;">
                         <label><i class="fa fa-arrows-alt-v"></i> Latitude</label>
-                        <input type="number" id="pin-lat" step="any" placeholder="-6.2088">
+                        <input type="number" id="pin-lat" step="any" placeholder="-6.2088" readonly style="background:#f0f0f0;">
                     </div>
                     <div class="pin-form-group" style="flex:1;">
                         <label><i class="fa fa-arrows-alt-h"></i> Longitude</label>
-                        <input type="number" id="pin-lng" step="any" placeholder="106.8456">
+                        <input type="number" id="pin-lng" step="any" placeholder="106.8456" readonly style="background:#f0f0f0;">
                     </div>
                 </div>
                 <div class="pin-form-group">
@@ -638,9 +635,8 @@
         boundaryLayer.clearLayers();
         cachedKecamatanData = {};
         cachedDesaData = {};
-        // Reset pin form and pin mode
+        // Reset pin form
         cancelPinForm();
-        if (pinMode) togglePinMode();
         // Reset wilayah dropdowns
         document.getElementById('provinsi-select').value = '';
         resetContainer('kabupaten-container', 'Kabupaten/Kota', 'fa-city');
@@ -681,29 +677,22 @@
     showProvinces();
 
     // ===== Pinned Places =====
-    var pinMode = false;
     var pinsLayer = L.layerGroup().addTo(map);
     var selectedPinColor = '#e74c3c';
 
-    function togglePinMode() {
-        pinMode = !pinMode;
-        var label = document.getElementById('pin-mode-label');
-        if (pinMode) {
-            label.textContent = 'Pin Mode ON';
-            map.getContainer().style.cursor = 'crosshair';
-        } else {
-            label.textContent = 'Pin Mode';
-            map.getContainer().style.cursor = '';
-        }
-    }
-
     map.on('click', function (e) {
-        if (!pinMode) return;
-        document.getElementById('pin-lat').value = e.latlng.lat.toFixed(6);
-        document.getElementById('pin-lng').value = e.latlng.lng.toFixed(6);
-        document.getElementById('pin-edit-id').value = '';
-        document.getElementById('pin-save-label').textContent = 'Save';
-        document.getElementById('pin-form-panel').style.display = 'block';
+        var lat = e.latlng.lat.toFixed(6);
+        var lng = e.latlng.lng.toFixed(6);
+        var popup = L.popup()
+            .setLatLng(e.latlng)
+            .setContent(
+                '<div style="text-align:center;">' +
+                '<b>' + lat + ', ' + lng + '</b><br>' +
+                '<button onclick="addPinFromMap(' + lat + ',' + lng + ')" ' +
+                'style="margin-top:6px;padding:4px 12px;background:#3f51b5;color:#fff;border:none;border-radius:4px;cursor:pointer;">' +
+                '<i class="fa fa-thumbtack"></i> Add Pin Here</button></div>'
+            )
+            .openOn(map);
     });
 
     function selectPinColor(el) {
@@ -714,11 +703,26 @@
         selectedPinColor = el.getAttribute('data-color');
     }
 
-    function showPinForm() {
-        document.getElementById('pin-form-panel').style.display = 'block';
+    function addPinFromMap(lat, lng) {
+        map.closePopup();
+        clearPinForm();
+        document.getElementById('pin-lat').value = lat;
+        document.getElementById('pin-lng').value = lng;
         document.getElementById('pin-edit-id').value = '';
         document.getElementById('pin-save-label').textContent = 'Save';
+        document.getElementById('pin-form-panel').style.display = 'block';
+        document.getElementById('pin-name').focus();
+    }
+
+    function showPinForm() {
         clearPinForm();
+        document.getElementById('pin-edit-id').value = '';
+        document.getElementById('pin-save-label').textContent = 'Save';
+        document.getElementById('pin-lat').removeAttribute('readonly');
+        document.getElementById('pin-lng').removeAttribute('readonly');
+        document.getElementById('pin-lat').style.background = '';
+        document.getElementById('pin-lng').style.background = '';
+        document.getElementById('pin-form-panel').style.display = 'block';
     }
 
     function cancelPinForm() {
@@ -731,6 +735,10 @@
         document.getElementById('pin-description').value = '';
         document.getElementById('pin-lat').value = '';
         document.getElementById('pin-lng').value = '';
+        document.getElementById('pin-lat').setAttribute('readonly', '');
+        document.getElementById('pin-lng').setAttribute('readonly', '');
+        document.getElementById('pin-lat').style.background = '#f0f0f0';
+        document.getElementById('pin-lng').style.background = '#f0f0f0';
         document.getElementById('pin-category').value = 'general';
         document.getElementById('pin-edit-id').value = '';
         document.querySelectorAll('#pin-color-options .color-option').forEach(function (c) {
@@ -775,7 +783,6 @@
         .then(function () {
             cancelPinForm();
             loadPins();
-            if (pinMode) togglePinMode();
         })
         .catch(function (err) { console.error('Error saving pin:', err); });
     }
