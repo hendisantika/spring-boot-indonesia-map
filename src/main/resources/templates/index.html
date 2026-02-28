@@ -120,6 +120,9 @@
         <a class="w3-bar-item w3-button" onclick="showProvinces()">
             <i class="fa fa-map-marker-alt"></i> Show Provinces
         </a>
+        <a class="w3-bar-item w3-button" onclick="scrollToPins()">
+            <i class="fa fa-thumbtack"></i> Pinned Places
+        </a>
     </div>
 </nav>
 
@@ -202,19 +205,8 @@
             </div>
         </div>
 
-        <!-- Detail Panel -->
-        <div id="detail-panel" class="w3-card w3-white w3-round-large w3-margin-bottom card-hover">
-            <div class="w3-container w3-theme-d1" style="border-radius: 8px 8px 0 0;">
-                <h4><i class="fa fa-info-circle"></i> Detail Wilayah</h4>
-            </div>
-            <div class="w3-container w3-padding w3-center w3-text-grey">
-                <i class="fa fa-map-marked-alt fa-3x w3-margin-bottom" style="opacity:0.3;"></i>
-                <p>Pilih wilayah untuk melihat detail</p>
-            </div>
-        </div>
-
         <!-- Pinned Places Panel -->
-        <div class="w3-card w3-white w3-round-large w3-margin-bottom card-hover">
+        <div id="pinned-places-panel" class="w3-card w3-white w3-round-large w3-margin-bottom card-hover">
             <div class="w3-container w3-theme-d1" style="border-radius: 8px 8px 0 0; display:flex; justify-content:space-between; align-items:center;">
                 <h4><i class="fa fa-thumbtack"></i> Pinned Places</h4>
                 <button class="w3-button w3-tiny w3-round w3-theme-action" onclick="showPinForm()" title="Add pin manually">
@@ -279,6 +271,17 @@
             <!-- Pin List -->
             <div id="pin-list" class="w3-container" style="max-height:300px; overflow-y:auto;">
                 <p class="w3-center w3-text-grey w3-small w3-padding"><i class="fa fa-info-circle"></i> No pins yet. Click the map or use + to add.</p>
+            </div>
+        </div>
+
+        <!-- Detail Panel -->
+        <div id="detail-panel" class="w3-card w3-white w3-round-large w3-margin-bottom card-hover">
+            <div class="w3-container w3-theme-d1" style="border-radius: 8px 8px 0 0;">
+                <h4><i class="fa fa-info-circle"></i> Detail Wilayah</h4>
+            </div>
+            <div class="w3-container w3-padding w3-center w3-text-grey">
+                <i class="fa fa-map-marked-alt fa-3x w3-margin-bottom" style="opacity:0.3;"></i>
+                <p>Pilih wilayah untuk melihat detail</p>
             </div>
         </div>
 
@@ -711,6 +714,10 @@
         selectedPinColor = el.getAttribute('data-color');
     }
 
+    function scrollToPins() {
+        document.getElementById('pinned-places-panel').scrollIntoView({ behavior: 'smooth' });
+    }
+
     function addPinFromMap(lat, lng, name) {
         map.closePopup();
         clearPinForm();
@@ -720,6 +727,7 @@
         document.getElementById('pin-edit-id').value = '';
         document.getElementById('pin-save-label').textContent = 'Save';
         document.getElementById('pin-form-panel').style.display = 'block';
+        scrollToPins();
         document.getElementById('pin-name').focus();
     }
 
