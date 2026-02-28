@@ -509,7 +509,9 @@
 
             // Find kecamatan by normalized name (ignore spaces, hyphens, case)
             var normalizedName = normalizeName(kecName);
+            console.log('[Kec Debug] kecName="' + kecName + '" normalized="' + normalizedName + '" total=' + allKec.length);
             var found = allKec.find(function (k) { return normalizeName(k.nama) === normalizedName; });
+            console.log('[Kec Debug] found=' + (found ? found.nama + ' hasPath=' + (found.path && found.path.length > 0) : 'null'));
 
             if (found && found.path && found.path.length > 0) {
                 if (found.lat && found.lng) {
@@ -563,10 +565,14 @@
             // Find desa by normalized name + parent_nama matching kecamatan (ignore spaces, hyphens, case)
             var normalizedDesaName = normalizeName(desaName);
             var normalizedKecName = normalizeName(kecName);
+            console.log('[Desa Debug] desaName="' + desaName + '" normalized="' + normalizedDesaName + '"');
+            console.log('[Desa Debug] kecName="' + kecName + '" normalized="' + normalizedKecName + '"');
+            console.log('[Desa Debug] kabCode="' + kabCode + '" totalDesa=' + allDesa.length);
             var found = allDesa.find(function (d) {
                 return normalizeName(d.nama) === normalizedDesaName &&
                     (!normalizedKecName || (d.parent_nama && normalizeName(d.parent_nama) === normalizedKecName));
             });
+            console.log('[Desa Debug] found=' + (found ? found.nama + ' hasPath=' + (found.path && found.path.length > 0) : 'null'));
 
             if (found && found.path && found.path.length > 0) {
                 if (found.lat && found.lng) {
