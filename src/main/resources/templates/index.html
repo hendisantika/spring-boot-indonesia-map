@@ -394,6 +394,11 @@
         return coords;
     }
 
+    // ===== Name Normalization Helper =====
+    function normalizeName(name) {
+        return name.toLowerCase().replace(/[\s\-\.]+/g, '');
+    }
+
     // ===== Pin Popup Helper =====
     function pinButton(lat, lng, name) {
         return '<br><button onclick="addPinFromMap(' + lat + ',' + lng + ',\'' + name.replace(/'/g, "\\'") + '\')" ' +
@@ -502,9 +507,9 @@
             markersLayer.clearLayers();
             boundaryLayer.clearLayers();
 
-            // Find kecamatan by name (case-insensitive)
-            var lowerName = kecName.toLowerCase();
-            var found = allKec.find(function (k) { return k.nama.toLowerCase() === lowerName; });
+            // Find kecamatan by normalized name (ignore spaces, hyphens, case)
+            var normalizedName = normalizeName(kecName);
+            var found = allKec.find(function (k) { return normalizeName(k.nama) === normalizedName; });
 
             if (found && found.path && found.path.length > 0) {
                 if (found.lat && found.lng) {
@@ -555,12 +560,12 @@
             markersLayer.clearLayers();
             boundaryLayer.clearLayers();
 
-            // Find desa by name + parent_nama matching kecamatan (case-insensitive)
-            var lowerDesaName = desaName.toLowerCase();
-            var lowerKecName = kecName.toLowerCase();
+            // Find desa by normalized name + parent_nama matching kecamatan (ignore spaces, hyphens, case)
+            var normalizedDesaName = normalizeName(desaName);
+            var normalizedKecName = normalizeName(kecName);
             var found = allDesa.find(function (d) {
-                return d.nama.toLowerCase() === lowerDesaName &&
-                    (!lowerKecName || (d.parent_nama && d.parent_nama.toLowerCase() === lowerKecName));
+                return normalizeName(d.nama) === normalizedDesaName &&
+                    (!normalizedKecName || (d.parent_nama && normalizeName(d.parent_nama) === normalizedKecName));
             });
 
             if (found && found.path && found.path.length > 0) {
